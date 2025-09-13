@@ -14,23 +14,34 @@ from src.database.db_client import DBClient
 logger = get_logger("Ingestion")
 
 if __name__ == "__main__":
-    extractor = ExtractorFactory.get_extractor(EXTRACTOR)
-    ingestor = DocumentIngestor(extractor)
-    processed_files = ingestor.ingest_dir(f"{RAW_DATA_PATH}", export_format=EXPORT_FORMAT)
-    #print(processed_files)
+    # extractor = ExtractorFactory.get_extractor(EXTRACTOR)
+    # ingestor = DocumentIngestor(extractor)
+    # processed_files = ingestor.ingest_dir(f"{RAW_DATA_PATH}", export_format=EXPORT_FORMAT)
+    # #print(processed_files)
 
-    chunker = ChunkerFactory.get_chunker("markdown")
-    chuncker = DocumentChuncker(chunker=chunker)
-    chunks = chuncker.chunk(processed_files)
-    #print(chunks)
+    # chunker = ChunkerFactory.get_chunker("markdown")
+    # chuncker = DocumentChuncker(chunker=chunker)
+    # chunks = chuncker.chunk(processed_files)
+    # print(chunks)
 
-    embedder = EmbedderFactory.get_embedder("sbert")
-    indexer = DocumentIndexer(embedder=embedder)
-    indexed_chunks = indexer.index(chunks)
-    print(indexed_chunks[0])
+    # embedder = EmbedderFactory.get_embedder("sbert")
+    # indexer = DocumentIndexer(embedder=embedder)
+    # indexed_chunks = indexer.index(chunks)
+    # print(indexed_chunks[0])
+
+    # db_client = DBClient(DBFactory.get_db("postgres"))
+    # db_client.insert(indexed_chunks)
+
 
     db_client = DBClient(DBFactory.get_db("postgres"))
-    db_client.insert(indexed_chunks)
+    embedder = EmbedderFactory.get_embedder("sbert")
+    query = "Tell me about Compliance with Applicable Legislations"
+    query_emb = embedder.embed([query])[0].tolist()
+
+    results = db_client.hybrid_search(query, query_emb, top_k=5, alpha=0.6)
+
+    for r in results:
+        print(r[0], r[1][:60], r[2])  # id, content snippet, metadata
 
 
 

@@ -22,9 +22,11 @@ class PostgresDbAdapter(BaseDB):
                     metadata JSONB,
                     embedding VECTOR({self.dim}),
                     dedup_key TEXT GENERATED ALWAYS AS (md5(content || metadata::text)) STORED,
+                    fts tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
                     UNIQUE (dedup_key)
                 );
             """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_documents_fts ON documents USING GIN (fts);")
             self.conn.commit()
 
     def insert(self, records: List[Dict[str, Any]]):
@@ -57,21 +59,25 @@ class PostgresDbAdapter(BaseDB):
             )
             return cur.fetchall()
 
-    def hybrid_search(self, query: str, query_embedding: List[float], top_k: int = 5, alpha: float = 0.5):
+    def hybrid_search(self, query: str, query_embedding, top_k: int = 5, alpha: float = 0.5):
         """
         Hybrid search: combine vector + keyword scores
         alpha = weight for vector (0.0 = pure keyword, 1.0 = pure vector)
         """
+        # ✅ Normalize embedding type
+        if hasattr(query_embedding, "tolist"):
+            query_embedding = query_embedding.tolist()
+
         with self.conn.cursor() as cur:
             cur.execute(
                 f"""
                 SELECT id,
-                   content,
-                   metadata,
-                   (embedding <#> %s::vector) AS vector_distance,
-                   ts_rank(fts, plainto_tsquery('english', %s)) AS keyword_score,
-                   ((1 - %s) * (1 - ts_rank(fts, plainto_tsquery('english', %s))) +
-                    %s * (embedding <#> %s::vector)) AS hybrid_score
+                    content,
+                    metadata,
+                    (embedding <#> %s::vector) AS vector_distance,
+                    ts_rank(fts, plainto_tsquery('english', %s)) AS keyword_score,
+                    ((1 - %s) * (1 - ts_rank(fts, plainto_tsquery('english', %s))) +
+                        %s * (embedding <#> %s::vector)) AS hybrid_score
                 FROM documents
                 WHERE fts @@ plainto_tsquery('english', %s)
                 ORDER BY hybrid_score ASC

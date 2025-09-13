@@ -17,3 +17,24 @@ class DBClient:
         except Exception as e:
             logger.exception(f"Failed to insert {chunks}")
             raise
+
+    def hybrid_search(self, query: str, query_embedding: List[float], top_k: int = 5, alpha: float = 0.5):
+        logger.info(f"Searching for {query} with {self.db.__class__.__name__}")
+        try:
+            results = self.db.hybrid_search(query, query_embedding, top_k, alpha)
+            logger.info(f"Found {len(results)} results")
+            return results
+        except Exception as e:
+            logger.exception(f"Failed to search for {query}")
+            raise
+    
+    def search(self, query_embedding: List[float], top_k: int = 5):
+        logger.info(f"Searching for {query_embedding} with {self.db.__class__.__name__}")
+        try:
+            results = self.db.search(query_embedding, top_k)
+            logger.info(f"Found {len(results)} results")
+            return results
+        except Exception as e:
+            logger.exception(f"Failed to search for {query_embedding}")
+            raise
+        
