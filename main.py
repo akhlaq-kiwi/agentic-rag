@@ -6,6 +6,8 @@ from src.logger import get_logger
 
 from src.data_ingestion import DocumentIngestor
 from src.data_ingestion import ExtractorFactory
+from src.data_ingestion.factories.embedding_factory import EmbedderFactory
+from src.data_ingestion import DocumentIndexer
 
 logger = get_logger("Ingestion")
 
@@ -13,9 +15,16 @@ if __name__ == "__main__":
     extractor = ExtractorFactory.get_extractor(EXTRACTOR)
     ingestor = DocumentIngestor(extractor)
     processed_files = ingestor.ingest_dir(f"{RAW_DATA_PATH}", export_format=EXPORT_FORMAT)
-    print(processed_files)
+    #print(processed_files)
 
     chunker = ChunkerFactory.get_chunker("markdown")
     chuncker = DocumentChuncker(chunker=chunker)
     chunks = chuncker.chunk(processed_files)
-    print(chunks)
+    #print(chunks)
+
+    embedder = EmbedderFactory.get_embedder("sbert")
+    indexer = DocumentIndexer(embedder=embedder)
+    indexed_chunks = indexer.index(chunks)
+    print(indexed_chunks[0])
+
+
