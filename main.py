@@ -1,6 +1,6 @@
 from src.data_ingestion.chuncker import DocumentChuncker
 from src.data_ingestion.factories.chunker_factory import ChunkerFactory
-from src.config import EXTRACTOR, EXPORT_FORMAT, RAW_DATA_PATH
+from src.config import EXTRACTOR, EXPORT_FORMAT, RAW_DATA_PATH, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT
 
 from src.logger import get_logger
 
@@ -8,6 +8,8 @@ from src.data_ingestion import DocumentIngestor
 from src.data_ingestion import ExtractorFactory
 from src.data_ingestion.factories.embedding_factory import EmbedderFactory
 from src.data_ingestion import DocumentIndexer
+from src.database.factories.db_factory import DBFactory
+from src.database.db_client import DBClient
 
 logger = get_logger("Ingestion")
 
@@ -26,5 +28,9 @@ if __name__ == "__main__":
     indexer = DocumentIndexer(embedder=embedder)
     indexed_chunks = indexer.index(chunks)
     print(indexed_chunks[0])
+
+    db_client = DBClient(DBFactory.get_db("postgres"))
+    db_client.insert(indexed_chunks)
+
 
 
