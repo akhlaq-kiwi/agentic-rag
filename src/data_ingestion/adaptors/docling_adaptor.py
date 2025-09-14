@@ -2,24 +2,22 @@ from src.logger import get_logger
 from ..base.base_extractor import BaseExtractor
 from typing import Union, Dict, Any
 from pathlib import Path
-from docling.document_converter import DocumentConverter, PipelineOptions, InputFormat, PdfFormatOption
-from src.config import ENABLE_OCR, ENABLE_TABLES
+from docling.document_converter import DocumentConverter
+import os
 
 
 logger = get_logger("Docling Extractor", "logs/ingestion.log")
 
 class DoclingExtractor(BaseExtractor):
     def __init__(self):
-        self.pipeline_options = PipelineOptions(
-            do_ocr=False,
-            do_tables=False,
-            do_picture_description=False # skip picture captioning to avoid that error
-        )
-        self.converter = DocumentConverter(
-            # format_options={
-            #     InputFormat.PDF: PdfFormatOption(pipeline_options=self.pipeline_options)
-            # }
-        )
+        # Use minimal DocumentConverter without custom pipeline options
+        # to avoid compatibility issues with different docling versions
+        try:
+            self.converter = DocumentConverter()
+            logger.info("Docling DocumentConverter initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize DocumentConverter: {e}")
+            raise
 
     def extract(self, source: Union[str, Path], export_format: str = "text") -> Union[str, Dict]:
         logger.info(f"[Docling] Extracting {source} as {export_format}")

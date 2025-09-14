@@ -41,7 +41,6 @@ class DocumentIngestor:
                     f.write(content)
             
             logger.info(f"Saved {processed_file}")
-            logger.info(f"Chunked {processed_file} into {len(md_chunks)} chunks")
             return processed_file
         except Exception as e:
             logger.exception(f"Failed to ingest {source}")

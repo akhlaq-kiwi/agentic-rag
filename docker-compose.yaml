@@ -78,9 +78,10 @@ services:
       - DATABASE_PASSWORD=admin
       - DATABASE_NAME=agentic-rag
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_API_BASE=http://ollama:11434
       - DIM=768
       - EXTRACTOR=docling
-      - EXPORT_FORMAT=text
+      - EXPORT_FORMAT=markdown
       - SOURCE_DATA_PATH=data
     volumes:
       - ./src:/app/src
@@ -94,6 +95,8 @@ services:
     restart: "no"
     profiles:
       - ingestion
+    networks:
+      - default
 
   # OpenWebUI for chat interface
   open-webui:

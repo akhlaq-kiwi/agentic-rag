@@ -1,6 +1,6 @@
 from src.logger import get_logger
 from ..base.base_extractor import BaseExtractor
-from ..adaptors.dockling_adaptor import DoclingExtractor
+from ..adaptors.docling_adaptor import DoclingExtractor
 
 logger = get_logger("Extractor Factory", "logs/ingestion.log")
 

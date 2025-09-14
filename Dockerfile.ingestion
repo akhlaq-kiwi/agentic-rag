@@ -7,11 +7,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     gcc \
     g++ \
+    libgl1-mesa-dri \
+    libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
 COPY requirement.txt .
 RUN pip install --no-cache-dir -r requirement.txt
+
 
 # Copy application code
 COPY src/ ./src/
@@ -20,6 +24,9 @@ COPY .env.docker .env
 
 # Create data directory
 RUN mkdir -p /app/data/raw /app/data/processed
+
+# Set environment variables for PDF processing
+ENV PDF_EXTRACTOR=simple_pdf
 
 # Run the ingestion pipeline
 CMD ["python", "main.py"]

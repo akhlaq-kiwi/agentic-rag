@@ -22,20 +22,20 @@ Complete containerized setup for the Agentic RAG system with all components.
 docker-compose up -d postgres ollama rag-api open-webui phoenix
 
 # Check service health
-docker-compose ps
+docker compose ps
 ```
 
 ### 2. Setup Ollama Models
 ```bash
 # Pull required models
-docker-compose exec ollama ollama pull gemma:2b
-docker-compose exec ollama ollama pull nomic-embed-text
+docker compose exec ollama ollama pull gemma:2b
+docker compose exec ollama ollama pull nomic-embed-text
 ```
 
 ### 3. Run Data Ingestion
 ```bash
 # Ingest documents from data/raw/ folder
-docker-compose --profile ingestion up ingestion
+docker compose --profile ingestion up ingestion
 ```
 
 ### 4. Access Services
@@ -49,26 +49,26 @@ docker-compose --profile ingestion up ingestion
 ### Run Evaluation
 ```bash
 # Run RAGAS evaluation
-docker-compose --profile evaluation up evaluation
+docker compose --profile evaluation up evaluation
 
 # View evaluation results
-docker-compose exec evaluation cat /app/evaluation/results/ragas_evaluation_report.json
+docker compose exec evaluation cat /app/evaluation/results/ragas_evaluation_report.json
 ```
 
 ### Development Mode
 ```bash
 # Use override for development (live code reload)
-docker-compose -f docker-compose.yaml -f docker-compose.override.yml up -d
+docker compose -f docker-compose.yaml -f docker-compose.override.yml up -d
 ```
 
 ### View Logs
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f rag-api
-docker-compose logs -f phoenix
+docker compose logs -f rag-api
+docker compose logs -f phoenix
 ```
 
 ## Configuration
