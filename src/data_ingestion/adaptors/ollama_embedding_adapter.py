@@ -17,8 +17,8 @@ class OllamaEmbeddingAdapter(BaseEmbedding):
     def __init__(
         self,
         model_name: str = "nomic-embed-text",
-        context_model: str = "llama3:8b",
-        base_url: str = "http://localhost:11434",
+        context_model: str = "gemma:2b",
+        base_url: str = "http://ollama:11434",
         context_prompt_template: str = None,
     ):
         self.embed_model = model_name
@@ -64,8 +64,8 @@ class OllamaEmbeddingAdapter(BaseEmbedding):
             metadata = copy.deepcopy(chunk.get("metadata", {}))
 
             # Generate context
-            # context = self._generate_context(text)
-            # metadata["context"] = context
+            context = self._generate_context(text)
+            metadata["context"] = context
 
             # Create contextualized text
             contextual_text = f"[Context: ] {text}"
