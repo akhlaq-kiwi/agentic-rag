@@ -10,6 +10,7 @@ import logging
 import os
 import json
 import time
+import asyncio
 from datetime import datetime
 
 # Set environment variable for LiteLLM to use Ollama
@@ -111,7 +112,13 @@ async def chat_completions(request: ChatCompletionRequest):
         if request.stream:
             return StreamingResponse(
                 generate_stream_response(answer, request.model),
-                media_type="text/plain"
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "*"
+                }
             )
         else:
             return ChatCompletionResponse(
@@ -139,26 +146,33 @@ async def chat_completions(request: ChatCompletionRequest):
 
 async def generate_stream_response(content: str, model: str):
     """Generate streaming response for chat completions"""
+    # Send content in chunks for better streaming
+    chunk_size = 10  # words per chunk
     words = content.split()
     
-    for i, word in enumerate(words):
+    for i in range(0, len(words), chunk_size):
+        chunk_words = words[i:i + chunk_size]
+        chunk_content = " ".join(chunk_words)
+        if i + chunk_size < len(words):
+            chunk_content += " "
+            
         chunk = {
-            "id": f"chatcmpl-{int(time.time())}",
+            "id": f"chatcmpl-{int(time.time())}-{i}",
             "object": "chat.completion.chunk",
             "created": int(time.time()),
             "model": model,
             "choices": [{
                 "index": 0,
-                "delta": {"content": word + " "},
+                "delta": {"content": chunk_content},
                 "finish_reason": None
             }]
         }
         yield f"data: {json.dumps(chunk)}\n\n"
-        time.sleep(0.05)  # Small delay for streaming effect
+        await asyncio.sleep(0.1)  # Small delay for streaming effect
     
     # Final chunk
     final_chunk = {
-        "id": f"chatcmpl-{int(time.time())}",
+        "id": f"chatcmpl-{int(time.time())}-final",
         "object": "chat.completion.chunk",
         "created": int(time.time()),
         "model": model,

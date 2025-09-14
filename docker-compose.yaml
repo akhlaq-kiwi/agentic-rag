@@ -106,10 +106,11 @@ services:
       - "3000:8080"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OPENAI_API_BASE_URL=http://rag-api:8000/v1
+      - OPENAI_API_BASE_URL=http://rag-api:8000
       - OPENAI_API_KEY=dummy-key
       - WEBUI_SECRET_KEY=your-secret-key-here
       - ENABLE_RAG_HYBRID_SEARCH=true
+      - DEFAULT_MODELS=agentic-rag
     volumes:
       - open_webui_data:/app/backend/data
     depends_on:

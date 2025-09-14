@@ -17,7 +17,7 @@ def create_rag_agents():
     llm = "ollama/gemma:2b"
     
     # Set base URL for Ollama (without /api suffix as LiteLLM adds it)
-    os.environ["OLLAMA_API_BASE"] = "http://localhost:11434"
+    os.environ["OLLAMA_API_BASE"] = "http://ollama:11434"
 
     retriever_agent = Agent(
         name="Retriever",
