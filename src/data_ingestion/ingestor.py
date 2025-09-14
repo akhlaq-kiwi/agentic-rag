@@ -65,4 +65,4 @@ class DocumentIngestor:
             for f in os.listdir(source_dir)
             if not f.startswith(".") and not f.endswith(".DS_Store")
         ]
-        return self.batch_ingest(sources[1:], export_format)
+        return self.batch_ingest(sources, export_format)

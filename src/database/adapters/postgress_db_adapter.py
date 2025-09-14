@@ -32,7 +32,7 @@ class PostgresDbAdapter(BaseDB):
     def insert(self, records: List[Dict[str, Any]]):
         with self.conn.cursor() as cur:
             values = [
-                (r["text"], json.dumps(r.get("metadata", {})), r["embedding"].tolist())
+                (r["text"], json.dumps(r.get("metadata", {})), r["embedding"])
                 for r in records
             ]
             execute_values(
