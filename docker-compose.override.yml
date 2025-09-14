@@ -1,0 +1,24 @@
+# Override file for development and different environments
+version: "3.9"
+
+services:
+  # Development overrides
+  rag-api:
+    volumes:
+      - ./src:/app/src:ro
+      - ./data:/app/data
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+
+  ingestion:
+    volumes:
+      - ./src:/app/src:ro
+      - ./data:/app/data
+      - ./main.py:/app/main.py:ro
+
+  evaluation:
+    volumes:
+      - ./src:/app/src:ro
+      - ./evaluation:/app/evaluation:ro
+      - ./data:/app/data

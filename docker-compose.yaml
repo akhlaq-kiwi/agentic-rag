@@ -1,15 +1,166 @@
 version: "3.9"
 
 services:
+  # PostgreSQL with pgvector for vector storage
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agentic-rag-postgres
+    environment:
+      POSTGRES_DB: agentic-rag
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ollama for local LLM inference
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: agentic-rag-ollama
     ports:
-      - "11434:11434"        # expose Ollama API
+      - "11434:11434"
     volumes:
-      - ollama_data:/root/.ollama   # persist models
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # RAG API Service
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: agentic-rag-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=admin
+      - DATABASE_NAME=agentic-rag
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_API_BASE=http://ollama:11434
+      - DIM=768
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     restart: unless-stopped
 
+  # Data Ingestion Pipeline
+  ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile.ingestion
+    container_name: agentic-rag-ingestion
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=admin
+      - DATABASE_NAME=agentic-rag
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DIM=768
+      - EXTRACTOR=docling
+      - EXPORT_FORMAT=text
+      - SOURCE_DATA_PATH=data
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./main.py:/app/main.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - ingestion
+
+  # OpenWebUI for chat interface
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: agentic-rag-webui
+    ports:
+      - "3000:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_SECRET_KEY=your-secret-key-here
+      - RAG_API_BASE_URL=http://rag-api:8000
+    volumes:
+      - open_webui_data:/app/backend/data
+    depends_on:
+      - ollama
+      - rag-api
+    restart: unless-stopped
+
+  # Arize Phoenix for observability and tracing
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: agentic-rag-phoenix
+    ports:
+      - "6006:6006"
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
+    environment:
+      - PHOENIX_SQL_DATABASE_URL=sqlite:////tmp/phoenix.db
+      - PHOENIX_WORKING_DIR=/tmp
+    volumes:
+      - phoenix_data:/tmp
+    restart: unless-stopped
+
+  # RAGAS Evaluation Service
+  evaluation:
+    build:
+      context: .
+      dockerfile: Dockerfile.evaluation
+    container_name: agentic-rag-evaluation
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=admin
+      - DATABASE_NAME=agentic-rag
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - RAG_API_BASE_URL=http://rag-api:8000
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
+    volumes:
+      - ./src:/app/src
+      - ./evaluation:/app/evaluation
+      - ./data:/app/data
+    depends_on:
+      - postgres
+      - ollama
+      - rag-api
+      - phoenix
+    restart: "no"
+    profiles:
+      - evaluation
+
 volumes:
+  postgres_data:
+    driver: local
   ollama_data:
+    driver: local
+  open_webui_data:
+    driver: local
+  phoenix_data:
     driver: local
