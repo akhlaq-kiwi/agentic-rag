@@ -3,10 +3,10 @@ from psycopg2.extras import execute_values
 from typing import List, Dict, Any
 from ..base.base_db import BaseDB
 import json
-from src.config import DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT
+from src.config import DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT, DIM
 
 class PostgresDbAdapter(BaseDB):
-    def __init__(self, dim: int = 384):
+    def __init__(self, dim: int = 768):
         self.db_url = f"dbname={DATABASE_NAME} user={DATABASE_USER} password={DATABASE_PASSWORD} host={DATABASE_HOST} port={DATABASE_PORT}"
         self.dim = dim
         self.conn = psycopg2.connect(self.db_url)

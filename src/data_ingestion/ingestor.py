@@ -60,5 +60,9 @@ class DocumentIngestor:
 
     def ingest_dir(self, source_dir: Union[str, Path], export_format: str = "text") -> List[Union[str, Dict]]:
         logger.info(f"Ingesting directory {source_dir}")
-        sources = [Path(source_dir) / f for f in os.listdir(source_dir)] # if f.endswith(".pdf")]
-        return self.batch_ingest(sources, export_format)
+        sources = [
+            Path(source_dir) / f
+            for f in os.listdir(source_dir)
+            if not f.startswith(".") and not f.endswith(".DS_Store")
+        ]
+        return self.batch_ingest(sources[1:], export_format)

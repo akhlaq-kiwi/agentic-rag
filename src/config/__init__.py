@@ -18,6 +18,8 @@ DATABASE_USER=os.getenv("DATABASE_USER", "postgres")
 DATABASE_PASSWORD=os.getenv("DATABASE_PASSWORD", "secret")
 DATABASE_NAME=os.getenv("DATABASE_NAME", "test")
 DATABASE_DIM=int(os.getenv("DATABASE_DIM", 384))
+DIM=int(os.getenv("DIM", 768))
+OLLAMA_BASE_URL=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 
 

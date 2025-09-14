@@ -6,7 +6,7 @@ from ..base.base_chunker import BaseChunker
 
 class MarkdownChunker(BaseChunker):
     def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-                 chunk_size: int = 400, overlap: int = 50):
+                 chunk_size: int = 800, overlap: int = 100):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.chunk_size = chunk_size
         self.overlap = overlap

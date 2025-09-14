@@ -13,6 +13,11 @@ class BaseDB(ABC):
         pass
 
     @abstractmethod
+    def hybrid_search(self, query: str, query_embedding, top_k: int = 5, alpha: float = 0.5):
+        """Hybrid search: combine vector + keyword scores"""
+        pass
+
+    @abstractmethod
     def init_schema(self):
         """Initialize required tables/collections"""
         pass
