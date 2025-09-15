@@ -8,6 +8,11 @@ class BaseDB(ABC):
         pass
 
     @abstractmethod
+    def check_exists(self, content: str, metadata: dict) -> bool:
+        """Check if a record already exists based on content and metadata"""
+        pass
+
+    @abstractmethod
     def search(self, query_embedding: List[float], top_k: int = 5):
         """Search top_k records by similarity"""
         pass

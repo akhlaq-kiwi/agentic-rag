@@ -136,9 +136,14 @@ class HybridEmbeddingAdapter(BaseEmbedding):
             # Convert sparse vector to dense array for storage
             sparse_vector = sparse_matrix[i].toarray().flatten()
             
+            # Separate context from stable metadata for deduplication
+            original_metadata = copy.deepcopy(chunk.get("metadata", {}))
+            context = enriched_chunks[i]["metadata"].get("context", "")
+            
             result_chunk = {
                 "text": chunk["text"],
-                "metadata": enriched_chunks[i]["metadata"],
+                "metadata": original_metadata,  # Use original metadata for dedup_key
+                "context": context,  # Store context separately
                 "embedding": dense_embeddings[i],  # Keep backward compatibility
                 "dense_embedding": dense_embeddings[i],
                 "sparse_embedding": sparse_vector.tolist(),

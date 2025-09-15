@@ -20,6 +20,7 @@ class PostgresDbAdapter(BaseDB):
                     id SERIAL PRIMARY KEY,
                     content TEXT,
                     metadata JSONB,
+                    context TEXT,
                     embedding VECTOR({self.dim}),
                     sparse_embedding JSONB,
                     embedding_type TEXT DEFAULT 'dense',
@@ -35,6 +36,26 @@ class PostgresDbAdapter(BaseDB):
             cur.execute("CREATE INDEX IF NOT EXISTS idx_documents_metadata ON documents USING GIN (metadata);")
             self.conn.commit()
 
+    def check_exists(self, content: str, metadata: dict) -> bool:
+        """Check if a document already exists based on dedup_key"""
+        with self.conn.cursor() as cur:
+            # Use the same logic as the database's generated column
+            # Convert metadata dict to JSON string exactly as PostgreSQL does
+            metadata_json = json.dumps(metadata, separators=(',', ':'), sort_keys=True) if metadata else '{}'
+            
+            cur.execute(
+                "SELECT 1 FROM documents WHERE md5(content || metadata::text) = md5(%s || %s) LIMIT 1",
+                (content, metadata_json)
+            )
+            result = cur.fetchone() is not None
+            
+            # Debug logging
+            if result:
+                print(f"DEBUG: Found existing chunk for content: {content[:50]}...")
+            else:
+                print(f"DEBUG: No existing chunk found for content: {content[:50]}...")
+            return result
+
     def insert(self, records: List[Dict[str, Any]]):
         with self.conn.cursor() as cur:
             values = []
@@ -45,6 +66,7 @@ class PostgresDbAdapter(BaseDB):
                     values.append((
                         r["text"], 
                         json.dumps(r.get("metadata", {})), 
+                        r.get("context", ""),  # Store context separately
                         r["dense_embedding"],
                         json.dumps(r.get("sparse_embedding", [])),
                         "hybrid"
@@ -54,6 +76,7 @@ class PostgresDbAdapter(BaseDB):
                     values.append((
                         r["text"], 
                         json.dumps(r.get("metadata", {})), 
+                        r.get("context", ""),  # Store context separately
                         r["embedding"],
                         json.dumps([]),  # Empty sparse embedding
                         "dense"
@@ -62,7 +85,7 @@ class PostgresDbAdapter(BaseDB):
             execute_values(
                 cur,
                 """
-                INSERT INTO documents (content, metadata, embedding, sparse_embedding, embedding_type)
+                INSERT INTO documents (content, metadata, context, embedding, sparse_embedding, embedding_type)
                 VALUES %s
                 ON CONFLICT (dedup_key) DO NOTHING
                 """,

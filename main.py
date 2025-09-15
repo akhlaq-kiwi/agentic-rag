@@ -19,10 +19,10 @@ if __name__ == "__main__":
     processed_files = ingestor.ingest_dir(f"{RAW_DATA_PATH}", export_format=EXPORT_FORMAT)
     #print(processed_files)
 
+    # Initialize components for streaming processing
     chunker = ChunkerFactory.get_chunker("markdown")
     chuncker = DocumentChuncker(chunker=chunker)
-    chunks = chuncker.chunk(processed_files)
-
+    
     # Use hybrid search adapter for better retrieval accuracy
     embedder = EmbedderFactory.get_embedder(
         "hybrid",
@@ -32,11 +32,27 @@ if __name__ == "__main__":
         use_context_enrichment=True,
         max_features=5000
     )
-    indexer = DocumentIndexer(embedder=embedder)
-    indexed_chunks = indexer.index(chunks)
-
+    
     db_client = DBClient(DBFactory.get_db("postgres"))
-    db_client.insert(indexed_chunks)
+    
+    # Stream processing: chunk -> embed -> save immediately
+    def progress_callback(chunk, chunk_num, total_chunks, source, skipped=False):
+        """Optional callback to show progress"""
+        from pathlib import Path
+        source_name = Path(source).name
+        if skipped:
+            logger.info(f"Progress: {chunk_num}/{total_chunks} chunks from {source_name} (SKIPPED - already exists)")
+        else:
+            logger.info(f"Progress: {chunk_num}/{total_chunks} chunks from {source_name} (PROCESSED)")
+    
+    total_processed = chuncker.chunk_and_process_streaming(
+        sources=processed_files,
+        embedder=embedder,
+        db_client=db_client,
+        chunk_callback=progress_callback
+    )
+    
+    logger.info(f"Streaming ingestion completed! Total chunks processed: {total_processed}")
 
 
     # db_client = DBClient(DBFactory.get_db("postgres"))

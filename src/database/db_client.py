@@ -8,6 +8,15 @@ class DBClient:
     def __init__(self, db: BaseDB):
         self.db = db
 
+    def check_exists(self, content: str, metadata: dict) -> bool:
+        """Check if a chunk already exists in the database"""
+        logger.debug(f"Checking if chunk exists with {self.db.__class__.__name__}")
+        try:
+            return self.db.check_exists(content, metadata)
+        except Exception as e:
+            logger.exception(f"Failed to check existence for chunk")
+            raise
+
     def insert(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         logger.info(f"Inserting {len(chunks)} chunks with {self.db.__class__.__name__}")
         try:
