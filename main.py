@@ -23,7 +23,15 @@ if __name__ == "__main__":
     chuncker = DocumentChuncker(chunker=chunker)
     chunks = chuncker.chunk(processed_files)
 
-    embedder = EmbedderFactory.get_embedder("ollama", model_name="nomic-embed-text")
+    # Use hybrid search adapter for better retrieval accuracy
+    embedder = EmbedderFactory.get_embedder(
+        "hybrid",
+        dense_model_name="nomic-embed-text",
+        context_model="gemma:2b",
+        base_url="http://ollama:11434",
+        use_context_enrichment=True,
+        max_features=5000
+    )
     indexer = DocumentIndexer(embedder=embedder)
     indexed_chunks = indexer.index(chunks)
 
