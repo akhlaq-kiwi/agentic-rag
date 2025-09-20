@@ -42,10 +42,10 @@ dirtyjson==1.0.8
 diskcache==5.6.3
 distro==1.9.0
 docker==7.1.0
-docling==2.52.0
-docling-core==2.48.1
-docling-ibm-models==3.9.1
-docling-parse==4.4.0
+docling==2.45.0
+docling-core==2.45.0
+docling-ibm-models>==3.8.0
+docling-parse==4.3.0
 docstring_parser==0.17.0
 durationpy==0.10
 easyocr==1.7.2
@@ -258,6 +258,7 @@ tifffile==2025.9.9
 tiktoken==0.11.0
 tokenizers==0.20.3
 tomli==2.2.1
+transformers==4.46.3
 tomli_w==1.2.0
 torch==2.8.0
 torchvision==0.23.0

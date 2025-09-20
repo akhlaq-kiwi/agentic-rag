@@ -20,6 +20,8 @@ DATABASE_NAME=os.getenv("DATABASE_NAME", "test")
 DATABASE_DIM=int(os.getenv("DATABASE_DIM", 384))
 DIM=int(os.getenv("DIM", 768))
 OLLAMA_BASE_URL=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+EMBEDDING_LLM=os.getenv("EMBEDDING_LLM", "text-embedding-ada-002")
+LLM=os.getenv("LLM", "llama3.2")
 
 
 

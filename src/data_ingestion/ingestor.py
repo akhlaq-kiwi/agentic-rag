@@ -29,9 +29,9 @@ class DocumentIngestor:
                 raise ValueError(f"Unsupported export format: {export_format}")
             processed_file = Path(processed_file).with_suffix(export_file_ext)
 
-            if processed_file.exists():
-                logger.info(f"{processed_file} already exists")
-                return processed_file
+            # if processed_file.exists():
+            #     logger.info(f"{processed_file} already exists")
+            #     return processed_file
 
             content = self.extractor.extract(source, export_format)
             with open(processed_file, "w", encoding="utf-8") as f:
