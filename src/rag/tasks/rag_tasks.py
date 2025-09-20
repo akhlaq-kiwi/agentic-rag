@@ -1,32 +1,32 @@
 # src/tasks/rag_tasks.py
 from crewai import Task, Crew
-from crewai.process import Process
+from crewai import Crew, Task, Process
 
-
-def create_rag_crew(retriever_agent, rag_agent, llm_agent):
+def create_rag_crew(retriever_agent, answer_agent):
     retriever_task = Task(
-        description="Retrieve relevant chunks from pgvector for the query: {query}",
+        description="Retrieve relevant document chunks for the query: {query}",
         agent=retriever_agent,
-        expected_output="A list of relevant text chunks with metadata",
+        expected_output="Retrieved document chunks with source information and metadata",
     )
 
-    rag_task = Task(
-        description="Take the retrieved chunks and format them into a structured context for answering the query",
-        agent=rag_agent,
-        expected_output="A formatted context string including metadata and relevant text",
+    answer_task = Task(
+        description="""Based on the retrieved document chunks, provide a comprehensive answer to the user query: {query}
+        
+        Instructions:
+        - Use only the information from the retrieved chunks
+        - Provide a clear, well-structured answer
+        - Include relevant details and examples from the documents
+        - If multiple sources are relevant, synthesize the information
+        - If the retrieved context is insufficient, clearly state what information is missing
+        - Cite sources when appropriate (mention document names or sections)""",
+        agent=answer_agent,
+        expected_output="A comprehensive, accurate answer to the user's query based on the retrieved context",
         context=[retriever_task]
     )
 
-    llm_task = Task(
-        description="Answer the user query using the provided context. Be comprehensive and accurate.",
-        agent=llm_agent,
-        expected_output="A final human-readable answer to the query",
-        context=[retriever_task, rag_task]
-    )
-
     crew = Crew(
-        agents=[retriever_agent, rag_agent, llm_agent],
-        tasks=[retriever_task, rag_task, llm_task],
+        agents=[retriever_agent, answer_agent],
+        tasks=[retriever_task, answer_task],
         process=Process.sequential,
         verbose=True,
     )

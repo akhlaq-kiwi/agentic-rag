@@ -49,17 +49,16 @@ class ModelInfo(BaseModel):
 
 # Initialize agents and crew on startup
 retriever_agent = None
-rag_agent = None
-llm_agent = None
+answer_agent = None
 rag_crew = None
 
 @app.on_event("startup")
 async def startup_event():
-    global retriever_agent, rag_agent, llm_agent, rag_crew
+    global retriever_agent, answer_agent, rag_crew
     try:
         logger.info("Initializing RAG agents and crew...")
-        retriever_agent, rag_agent, llm_agent = create_rag_agents()
-        rag_crew = create_rag_crew(retriever_agent, rag_agent, llm_agent)
+        retriever_agent, answer_agent = create_rag_agents()
+        rag_crew = create_rag_crew(retriever_agent, answer_agent)
         logger.info("RAG system initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize RAG system: {str(e)}")

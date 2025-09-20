@@ -24,32 +24,28 @@ def create_rag_agents():
     os.environ["OLLAMA_API_BASE"] = "http://ollama:11434"
 
     retriever_agent = Agent(
-        name="Retriever",
-        role="Fetch relevant context",
-        goal="Retrieve the most relevant chunks for a query from pgvector",
-        backstory="You are a retrieval agent that understands embeddings and hybrid search.",
+        name="Document Retriever",
+        role="Retrieve relevant documents",
+        goal="Find and retrieve the most relevant document chunks for the user query",
+        backstory="You are an expert document retrieval specialist with access to a comprehensive document database.",
         tools=[pg_retriever_tool],
         llm=llm,
         verbose=True
     )
 
-    rag_agent = Agent(
-        name="RAG Orchestrator",
-        role="Build RAG context",
-        goal="Format retrieved docs into a coherent context for LLM answering",
-        backstory="You organize raw chunks into a concise context with metadata like page, section, etc.",
+    answer_agent = Agent(
+        name="Answer Generator",
+        role="Generate comprehensive answers",
+        goal="Answer user queries directly using the retrieved document chunks as context",
+        backstory="""You are an expert assistant that provides accurate, comprehensive answers based on retrieved document context. 
+        Your task is to:
+        1. Analyze the retrieved document chunks
+        2. Extract relevant information to answer the user's question
+        3. Provide a clear, well-structured response
+        4. Cite sources when appropriate
+        5. If the retrieved context doesn't contain enough information, clearly state what is missing""",
         llm=llm,
         verbose=True
     )
 
-    llm_agent = Agent(
-        name="LLM Generator",
-        role="Generate answers",
-        goal="Answer user queries using LLaMA 3 with given context",
-        backstory="You are an expert assistant providing well-structured answers based on the retrieved context.",
-        llm=llm,
-        verbose=True
-    )
-
-    return retriever_agent, rag_agent, llm_agent
-
+    return retriever_agent, answer_agent

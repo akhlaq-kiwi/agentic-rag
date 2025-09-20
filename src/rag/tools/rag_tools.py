@@ -1,6 +1,6 @@
 import os
 from crewai.tools import tool
-from src.config import DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, OLLAMA_BASE_URL, DIM, OLLAMA_BASE_URL, DATABASE_TABLE
+from src.config import LLM, EMBEDDING_LLM, DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, OLLAMA_BASE_URL, DIM, DATABASE_TABLE
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.core import Settings, VectorStoreIndex
@@ -71,13 +71,13 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
 
         # Configure Ollama LLM and embedding models
         llm = Ollama(
-            model="gemma:2b",
+            model=LLM.split("/")[1],
             base_url=OLLAMA_BASE_URL,
             request_timeout=120.0
         )
         
         embed_model = OllamaEmbedding(
-            model_name="nomic-embed-text:v1.5",
+            model_name=EMBEDDING_LLM,
             base_url=OLLAMA_BASE_URL,
             request_timeout=120.0  # Increased timeout for slower connections
         )
@@ -95,8 +95,8 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
         # Create a query engine with hybrid search mode - increased retrieval for maximum tokens
         query_engine = index.as_query_engine(
             vector_store_query_mode="hybrid",
-            similarity_top_k=2,  # Increased from 5 to utilize maximum token capacity
-            sparse_top_k=2       # Increased from 5 to get more comprehensive context
+            similarity_top_k=10,  # Increased from 5 to utilize maximum token capacity
+            sparse_top_k=10       # Increased from 5 to get more comprehensive context
         )
         
         # Query using hybrid search (combines vector + text search)
@@ -104,6 +104,8 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
         response = query_engine.query(search_query)
         print("Response:", response)
         retrieved_nodes = response.source_nodes
+
+        print("Retrieved nodes:", retrieved_nodes)
         
         if not retrieved_nodes:
             return "No relevant documents found for this query."
@@ -133,7 +135,7 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
                     context_info = f"\nContext: {context}"
                 
                 # Page number information (if available)
-                page_num = node.metadata.get('page_number', '')
+                page_num = node.metadata.get('page', '')
                 if page_num:
                     page_info = f" (Page {page_num})"
             
