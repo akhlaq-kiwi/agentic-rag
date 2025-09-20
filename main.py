@@ -20,7 +20,7 @@ if __name__ == "__main__":
     _indexer = IndexerFactory.get_indexer('llamaindex', 
                                          enable_context_enrichment=False,  # Set to False to disable
                                          context_timeout=30, 
-                                         chunk_size=50, chunk_overlap=10,
+                                         chunk_size=500, chunk_overlap=100,
                                          min_chars=50,
                                          mode="sentence"
                                         )  # Increase timeout if needed
