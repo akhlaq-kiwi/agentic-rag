@@ -22,7 +22,9 @@ if __name__ == "__main__":
                                          context_timeout=30, 
                                          chunk_size=700, chunk_overlap=150,
                                          min_chars=50,
-                                         mode="sentence"
+                                         mode="sentence",
+                                         enable_sparse_vectors=True,  # Enable hybrid search
+                                         sparse_top_k=1000  # Top-k features for sparse vectors
                                         )  # Increase timeout if needed
     indexer = DocumentIndexer(_indexer)
     index = indexer.index(processed_files)

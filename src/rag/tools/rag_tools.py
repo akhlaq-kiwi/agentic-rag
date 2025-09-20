@@ -73,13 +73,15 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
         llm = Ollama(
             model=LLM.split("/")[1],
             base_url=OLLAMA_BASE_URL,
-            request_timeout=120.0
+            request_timeout=120.0,
+            temperature=0.1
         )
         
         embed_model = OllamaEmbedding(
             model_name=EMBEDDING_LLM,
             base_url=OLLAMA_BASE_URL,
-            request_timeout=120.0  # Increased timeout for slower connections
+            request_timeout=120.0,
+            temperature=0.1
         )
 
         # Set global LlamaIndex settings to use Ollama
@@ -102,7 +104,7 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
         # Query using hybrid search (combines vector + text search)
         print("Querying using hybrid search...", search_query)
         response = query_engine.query(search_query)
-        print("Response:", response)
+        print("ResponseResponseResponseResponse:", response)
         retrieved_nodes = response.source_nodes
 
         print("Retrieved nodes:", retrieved_nodes)
@@ -122,12 +124,9 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
             
             if hasattr(node, 'metadata') and node.metadata:
                 # File information
-                file_name = node.metadata.get('source_file', node.metadata.get('file_name', 'Unknown file'))
-                file_path = node.metadata.get('file_path', '')
+                file_path = node.metadata.get('file_name', '')
                 if file_path:
                     source_info = f"Source: {os.path.basename(file_path)}"
-                else:
-                    source_info = f"Source: {file_name}"
                 
                 # Contextual information (if available)
                 context = node.metadata.get('context', '')
@@ -135,7 +134,7 @@ def pg_retriever_tool(query: Union[str, Dict[str, Any]]) -> str:
                     context_info = f"\nContext: {context}"
                 
                 # Page number information (if available)
-                page_num = node.metadata.get('page', '')
+                page_num = node.metadata.get('page_no', '')
                 if page_num:
                     page_info = f" (Page {page_num})"
             

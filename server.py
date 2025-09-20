@@ -48,17 +48,19 @@ class ModelInfo(BaseModel):
     owned_by: str = "agentic-rag"
 
 # Initialize agents and crew on startup
-retriever_agent = None
+query_router = None
+greeting_handler = None
+document_retriever = None
 answer_agent = None
 rag_crew = None
 
 @app.on_event("startup")
 async def startup_event():
-    global retriever_agent, answer_agent, rag_crew
+    global query_router, greeting_handler, document_retriever, answer_agent, rag_crew
     try:
         logger.info("Initializing RAG agents and crew...")
-        retriever_agent, answer_agent = create_rag_agents()
-        rag_crew = create_rag_crew(retriever_agent, answer_agent)
+        query_router, greeting_handler, document_retriever, answer_agent = create_rag_agents()
+        rag_crew = create_rag_crew(query_router, greeting_handler, document_retriever, answer_agent)
         logger.info("RAG system initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize RAG system: {str(e)}")
