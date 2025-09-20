@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 from src.rag.agents.rag_agent import create_rag_agents
 from src.rag.tasks.rag_tasks import create_rag_crew
-from src.config import DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, DIM, OLLAMA_BASE_URL
+from src.config import OLLAMA_BASE_URL
 import logging
 import os
 import json
@@ -206,3 +206,8 @@ async def health_check():
         "rag_initialized": rag_crew is not None,
         "timestamp": datetime.now().isoformat()
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+

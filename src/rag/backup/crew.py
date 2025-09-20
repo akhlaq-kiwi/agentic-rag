@@ -1,5 +1,7 @@
 from crewai import Crew, Process, Task
-from agents import document_researcher, insight_synthesizer
+from src.rag.agents.rag_agent import create_rag_agents
+
+retriever_agent, rag_agent, llm_agent = create_rag_agents()
 
 def create_rag_crew(query: str):
     """
@@ -13,7 +15,7 @@ def create_rag_crew(query: str):
     research_task = Task(
         description=f"Find relevant information in the policy and standards documents for the query: '{query}'.",
         expected_output="A block of text containing chunks of the most relevant document sections and their source file names.",
-        agent=document_researcher
+        agent=retriever_agent
     )
 
     # Task for the Insight Synthesizer agent
@@ -33,13 +35,13 @@ def create_rag_crew(query: str):
         - Include precise figures, timeframes, and regulatory references where applicable
 
         The response should feel conversational yet authoritative, avoiding repetitive headers unless the content genuinely requires structured breakdown.""",
-        agent=insight_synthesizer,
+        agent=rag_agent,
         context=[research_task] # This ensures it uses the output from the research_task
     )
 
     # Create the crew with a sequential process
     rag_crew = Crew(
-        agents=[document_researcher, insight_synthesizer],
+        agents=[retriever_agent, rag_agent, llm_agent],
         tasks=[research_task, synthesis_task],
         process=Process.sequential, # The tasks will be executed one after the other
         verbose=True

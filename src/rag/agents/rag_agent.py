@@ -4,8 +4,8 @@ from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.core import VectorStoreIndex
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
-from src.config import DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, DIM, OLLAMA_BASE_URL
-from ..tools.rag_tools import pg_retriever_tool
+from src.config import DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, DIM, OLLAMA_BASE_URL, LLM
+from src.rag.tools.rag_tools import pg_retriever_tool
 import os
 
 # Set environment variable for LiteLLM to use Ollama
@@ -14,7 +14,11 @@ os.environ["OLLAMA_API_BASE"] = OLLAMA_BASE_URL
 def create_rag_agents():
     # CrewAI uses LiteLLM under the hood
     # For Ollama, use the format: ollama/model_name
-    llm = "ollama/gemma:2b"
+    llm = Ollama(
+        model=LLM,
+        base_url=OLLAMA_BASE_URL,
+        request_timeout=120.0
+    )
     
     # Set base URL for Ollama (without /api suffix as LiteLLM adds it)
     os.environ["OLLAMA_API_BASE"] = "http://ollama:11434"
