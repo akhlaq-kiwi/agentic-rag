@@ -27,7 +27,6 @@ class DocumentIndexer:
 
     def index(self, sources: List[Union[str, Path]], **kwargs) -> Any:
         index = self.indexer.create_index(sources, **kwargs)
-        print(index)
         return index
 
 class PgVectorIndexer:
