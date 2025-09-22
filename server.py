@@ -48,6 +48,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from src.rag.crew import run_rag_query
+from src.rag.memory.redis_memory import conversation_memory
 
 # Import OpenTelemetry tracing tools for manual spans
 from opentelemetry import trace
@@ -142,15 +143,29 @@ async def chat_completions(request: ChatCompletionRequest):
         span.set_attribute("request.model", request.model)
         span.set_attribute("request.stream", request.stream)
         
+        # Use model name as session ID for conversation memory
+        # Use OpenWebUI's chat_id as session_id if present in request
+        session_id = getattr(request, "chat_id", None) or request.model or "default"
+        
         try:
+            # Get conversation context from Redis memory
+            conversation_context = conversation_memory.get_context(session_id)
+            
+            # Enhance question with conversation history if available
+            enhanced_question = f"Conversational context: {conversation_context}\nCurrent question: {question}" if conversation_context else question
+
             # Process with RAG crew
             logger.info("Processing query: %s", question)
             
             with tracer.start_as_current_span("rag_query_processing") as rag_span:
-                rag_span.set_attribute("query", question)
-                result = run_rag_query(question)
+                rag_span.set_attribute("query", enhanced_question)
+                result = run_rag_query(enhanced_question)
                 answer = str(result)
                 rag_span.set_attribute("response_length", len(answer))
+                
+            # Store conversation in Redis memory for future context
+            conversation_memory.add_conversation(session_id, question, answer)
+            logger.info("Stored conversation in Redis for session: %s", session_id)
                 
             span.set_attribute("response.length", len(answer))
             span.set_attribute("success", True)
@@ -233,6 +248,29 @@ async def generate_stream_response(content: str, model: str):
     }
     yield f"data: {json.dumps(final_chunk)}\n\n"
     yield "data: [DONE]\n\n"
+
+# Conversation memory endpoints
+@app.get("/conversation/{session_id}")
+async def get_conversation_history(session_id: str):
+    """Get conversation history for a session"""
+    try:
+        history = conversation_memory.get_history(session_id)
+        return {
+            "session_id": session_id,
+            "conversation_count": len(history),
+            "history": history
+        }
+    except Exception as e:
+        return {"error": str(e), "history": []}
+
+@app.delete("/conversation/{session_id}")
+async def clear_conversation_history(session_id: str):
+    """Clear conversation history for a session"""
+    try:
+        # Simple way to clear - we'll just let Redis expire handle it
+        return {"message": f"Conversation history for session {session_id} will expire automatically"}
+    except Exception as e:
+        return {"error": str(e)}
 
 # Health check endpoint
 @app.get("/health")

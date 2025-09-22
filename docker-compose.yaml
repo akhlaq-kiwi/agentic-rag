@@ -20,6 +20,23 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Redis for conversational memory storage
+  redis:
+    image: redis:7-alpine
+    container_name: agentic-rag-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # RAG API Service
   rag-api:
     build:
@@ -34,6 +51,10 @@ services:
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=admin
       - DATABASE_NAME=agentic-rag
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CONVERSATION_HISTORY_LIMIT=5
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - OLLAMA_API_BASE=http://host.docker.internal:11434
       - DIM=768
@@ -43,6 +64,8 @@ services:
       - ./data:/app/data
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     extra_hosts:
@@ -140,7 +163,7 @@ services:
       - ./src:/app/src
       - ./data:/app/data
       - ./evaluate.py:/app/evaluate.py
-      - ./evaluation_results:/app/evaluation_results
+      - ./data/evaluation_data/evaluation_results:/app//data/evaluation_data/evaluation_results
     depends_on:
       postgres:
         condition: service_healthy
@@ -156,6 +179,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   open_webui_data:
     driver: local

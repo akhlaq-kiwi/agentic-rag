@@ -7,6 +7,7 @@ Complete containerized setup for the Agentic RAG system with all components.
 | Service | Port | Description |
 |---------|------|-------------|
 | **postgres** | 5434 | PostgreSQL with pgvector for document storage |
+| **redis** | 6379 | Redis for conversational memory (last 5 chats) |
 | **ollama** | 11434 | Local LLM inference (Gemma 2B) |
 | **rag-api** | 8000 | FastAPI RAG service with CrewAI agents |
 | **open-webui** | 3000 | Chat interface for RAG system |
