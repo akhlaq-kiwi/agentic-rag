@@ -11,12 +11,28 @@ import json
 import time
 import asyncio
 from datetime import datetime
+from phoenix.otel import register
+from src.config import PHOENIX_COLLECTOR_ENDPOINT, PHOENIX_PROJECT_NAME
 
 # Set environment variable for LiteLLM to use Ollama
 os.environ["OLLAMA_API_BASE"] = OLLAMA_BASE_URL
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+try:
+    from phoenix.otel import register
+    tracer_provider = register(
+        project_name=PHOENIX_PROJECT_NAME,
+        endpoint=f"{PHOENIX_COLLECTOR_ENDPOINT}/v1/traces",
+        auto_instrument=True  # This automatically instruments CrewAI and other libraries
+    )
+    logging.info(f"Arize Phoenix tracing successfully initialized for API server at {PHOENIX_COLLECTOR_ENDPOINT}")
+except ImportError as e:
+    logging.warning(f"Phoenix module not found: {e}. Install with: pip install arize-phoenix")
+except Exception as e:
+    logging.warning(f"Could not initialize Arize Phoenix tracing: {e}")
 
 app = FastAPI(title="Agentic RAG API", description="OpenAI-compatible RAG API for OpenWebUI")
 

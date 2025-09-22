@@ -24,6 +24,8 @@ DIM=int(os.getenv("DIM", 768))
 OLLAMA_BASE_URL=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 EMBEDDING_LLM=os.getenv("EMBEDDING_LLM", "text-embedding-ada-002")
 LLM=os.getenv("LLM", "llama3.2")
+PHOENIX_COLLECTOR_ENDPOINT=os.getenv("PHOENIX_COLLECTOR_ENDPOINT", "")
+PHOENIX_PROJECT_NAME=os.getenv("PHOENIX_PROJECT_NAME", "default")
 
 
 
