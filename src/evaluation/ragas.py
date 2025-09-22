@@ -12,8 +12,9 @@ from ragas.metrics import (
 )
 from dotenv import load_dotenv
 from src.rag.crew import run_rag_query
-from src.config import (EVALUATION_DATA_PATH)
+from src.config import (EVALUATION_DATA_PATH, OPENAI_API_KEY)
 
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
 class RagasEvaluator:
     """
@@ -188,6 +189,6 @@ async def raga_runner(dataset: str):
     Main function to initialize and run the RAGAS evaluation using the class-based approach.
     """
     # Initialize the evaluator
-    evaluator = RagasEvaluator(dataset) 
+    evaluator = RagasEvaluator(dataset = dataset)
     # Run the evaluation
     await evaluator.run_evaluation()

@@ -10,6 +10,7 @@ INDEXER = os.getenv("INDEXER", "llamaindex")
 SOURCE_DATA_PATH = os.getenv("SOURCE_DATA_PATH", "data")
 RAW_DATA_PATH = f"{SOURCE_DATA_PATH}/raw/"
 EVALUATION_DATA_PATH = f"{SOURCE_DATA_PATH}/evaluation_data/"
+EVALUATION_RESULTS_PATH = f"{EVALUATION_DATA_PATH}/evaluation_results/"
 PROCESSED_DATA_PATH = f"{SOURCE_DATA_PATH}/processed/"
 ENABLE_OCR=bool(os.getenv("ENABLE_OCR", "false"))
 ENABLE_TABLES=bool(os.getenv("ENABLE_TABLES", "false"))
@@ -27,6 +28,7 @@ EMBEDDING_LLM=os.getenv("EMBEDDING_LLM", "text-embedding-ada-002")
 LLM=os.getenv("LLM", "llama3.2")
 PHOENIX_COLLECTOR_ENDPOINT=os.getenv("PHOENIX_COLLECTOR_ENDPOINT", "")
 PHOENIX_PROJECT_NAME=os.getenv("PHOENIX_PROJECT_NAME", "default")
+OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", "")
 
 
 

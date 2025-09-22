@@ -14,19 +14,20 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from src.evaluation.ragas import raga_runner
+from src.config import EVALUATION_RESULTS_PATH
+import csv
 
 def setup_results_directory():
     """Create results directory if it doesn't exist."""
-    results_dir = Path("evaluation_results")
+    results_dir = Path(f"{EVALUATION_RESULTS_PATH}")
     results_dir.mkdir(exist_ok=True)
     return results_dir
 
 def save_evaluation_results(results, dataset_name: str, results_dir: Path):
-    """Save evaluation results to JSON file."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"ragas_evaluation_{dataset_name.replace('.jsonl', '')}_{timestamp}.json"
-    filepath = results_dir / filename
-    
+    """Save evaluation results to CSV file, appending each run."""
+    csv_filename = "results.csv"
+    csv_filepath = results_dir / csv_filename
+
     # Convert results to dict if needed
     if hasattr(results, 'to_dict'):
         results_dict = results.to_dict()
@@ -34,19 +35,25 @@ def save_evaluation_results(results, dataset_name: str, results_dir: Path):
         results_dict = results.__dict__
     else:
         results_dict = {"results": str(results)}
-    
+
     # Add metadata
-    results_dict["metadata"] = {
-        "dataset": dataset_name,
-        "timestamp": timestamp,
-        "evaluation_date": datetime.now().isoformat()
-    }
-    
-    with open(filepath, 'w') as f:
-        json.dump(results_dict, f, indent=2, default=str)
-    
-    print(f"📊 Results saved to: {filepath}")
-    return filepath
+    results_dict["dataset"] = dataset_name
+    results_dict["timestamp"] = timestamp
+    results_dict["evaluation_date"] = datetime.now().isoformat()
+
+    # Prepare row for CSV
+    row = results_dict
+
+    # Write header only if file does not exist
+    write_header = not csv_filepath.exists()
+    with open(csv_filepath, 'a', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=row.keys())
+        if write_header:
+            writer.writeheader()
+        writer.writerow(row)
+
+    print(f"📊 Results appended to: {csv_filepath}")
+    return csv_filepath
 
 async def main():
     """Main function to run RAGAS evaluation with command line arguments."""
