@@ -48,11 +48,20 @@ docker compose --profile ingestion up ingestion
 
 ### Run Evaluation
 ```bash
-# Run RAGAS evaluation
+# Run RAGAS evaluation with default small dataset
 docker compose --profile evaluation up evaluation
 
+# Run evaluation with large dataset
+EVALUATION_DATASET=large_dataset.jsonl docker compose --profile evaluation up evaluation
+
+# Run evaluation with custom dataset
+EVALUATION_DATASET=my_custom_dataset.jsonl docker compose --profile evaluation up evaluation
+
 # View evaluation results
-docker compose exec evaluation cat /app/evaluation/results/ragas_evaluation_report.json
+ls -la evaluation_results/
+
+# View specific evaluation result
+cat evaluation_results/ragas_evaluation_small_dataset_*.json
 ```
 
 ### Development Mode
@@ -83,8 +92,15 @@ docker compose logs -f phoenix
 - `open_webui_data`: Chat history
 - `phoenix_data`: Observability data
 
-### Custom Test Cases
-Edit `evaluation/test_cases.json` to add your own evaluation scenarios.
+### Evaluation Datasets
+Available datasets in `data/evaluation_data/`:
+- `small_dataset.jsonl`: Quick evaluation with 10-20 questions
+- `large_dataset.jsonl`: Comprehensive evaluation with 100+ questions
+
+### Evaluation Results
+- Results are automatically saved to `evaluation_results/` directory
+- Each run creates a timestamped JSON file with metrics and metadata
+- Results include RAGAS metrics: faithfulness, answer relevancy, context precision/recall
 
 ## Troubleshooting
 

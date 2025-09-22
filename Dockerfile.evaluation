@@ -22,8 +22,15 @@ RUN pip install --no-cache-dir \
 
 # Copy application code
 COPY src/ ./src/
-COPY evaluation/ ./evaluation/
+COPY evaluate.py ./evaluate.py
 COPY .env.docker .env
 
+# Create results directory
+RUN mkdir -p /app/evaluation_results
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
 # Run evaluation
-CMD ["python", "-m", "evaluation.run_evaluation"]
+CMD ["python", "evaluate.py"]

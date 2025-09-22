@@ -132,14 +132,21 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - RAG_API_BASE_URL=http://rag-api:8000
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006
+      - PHOENIX_PROJECT_NAME=ragas-evaluation
+      - SOURCE_DATA_PATH=data
+      - EVALUATION_DATASET=${EVALUATION_DATASET:-small_dataset.jsonl}
     volumes:
       - ./src:/app/src
-      - ./evaluation:/app/evaluation
       - ./data:/app/data
+      - ./evaluate.py:/app/evaluate.py
+      - ./evaluation_results:/app/evaluation_results
     depends_on:
-      - postgres
-      - rag-api
-      - phoenix
+      postgres:
+        condition: service_healthy
+      rag-api:
+        condition: service_started
+      phoenix:
+        condition: service_started
     restart: "no"
     profiles:
       - evaluation
