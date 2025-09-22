@@ -1,9 +1,11 @@
-from src.rag.tools.rag_tools import pg_retriever_tool
+from src.rag.crew import run_rag_query
 
-user_message = "What should An employee with a disability shall be granted a fully-paid leave for a (5) working days per year at most?"
+# Test with optimized RAG crew
+user_message = "Explain 2.10.2 'SAP Ariba - Core Administration' Overview?"
 
-# rag_crew = create_rag_crew(user_message)
-# result = rag_crew.kickoff()
+print("🚀 Testing Optimized RAG Crew...")
+print(f"Query: {user_message}")
+print("="*80)
 
-data = pg_retriever_tool.run(user_message)
-print(data)
+result = run_rag_query(user_message)
+print(result)

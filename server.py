@@ -3,8 +3,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
-from src.rag.agents.rag_agent import create_rag_agents
-from src.rag.tasks.rag_tasks import create_rag_crew
+from src.rag.crew import run_rag_query
 from src.config import OLLAMA_BASE_URL
 import logging
 import os
@@ -48,19 +47,15 @@ class ModelInfo(BaseModel):
     owned_by: str = "agentic-rag"
 
 # Initialize agents and crew on startup
-query_router = None
-greeting_handler = None
-document_retriever = None
-answer_agent = None
 rag_crew = None
 
 @app.on_event("startup")
 async def startup_event():
-    global query_router, greeting_handler, document_retriever, answer_agent, rag_crew
+    global rag_crew
     try:
-        logger.info("Initializing RAG agents and crew...")
-        query_router, greeting_handler, document_retriever, answer_agent = create_rag_agents()
-        rag_crew = create_rag_crew(query_router, greeting_handler, document_retriever, answer_agent)
+        logger.info("Initializing RAG system...")
+        # Set rag_crew to True to indicate system is ready
+        rag_crew = True
         logger.info("RAG system initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize RAG system: {str(e)}")
@@ -107,7 +102,8 @@ async def chat_completions(request: ChatCompletionRequest):
     
     try:
         # Process with RAG crew
-        result = rag_crew.kickoff(inputs={"query": question})
+        logger.info(f"Processing query: {question}")
+        result = run_rag_query(question)
         answer = str(result)
         
         if request.stream:
@@ -185,19 +181,6 @@ async def generate_stream_response(content: str, model: str):
     }
     yield f"data: {json.dumps(final_chunk)}\n\n"
     yield "data: [DONE]\n\n"
-
-# Legacy RAG endpoint
-@app.get("/query")
-async def query_rag(question: str = Query(..., description="User query")):
-    if not rag_crew:
-        raise HTTPException(status_code=503, detail="RAG system not initialized")
-    
-    try:
-        result = rag_crew.kickoff(inputs={"query": question})
-        return {"question": question, "answer": str(result)}
-    except Exception as e:
-        logger.error(f"Error processing query: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 # Health check endpoint
 @app.get("/health")

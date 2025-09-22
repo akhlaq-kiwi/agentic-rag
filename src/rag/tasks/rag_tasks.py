@@ -1,90 +1,64 @@
-# src/tasks/rag_tasks.py
-from crewai import Task, Crew
-from crewai import Crew, Task, Process
+# src/tasks/rag_tasks.py - OPTIMIZED VERSION
+from crewai import Task, Crew, Process
 
-def create_rag_crew(query_router, greeting_handler, document_retriever, answer_agent):
-    routing_task = Task(
-        description="""Analyze the user query: {query}
-        
-        Classify the query and respond with one of these formats:
-        - For greetings (hello, hi, good morning, etc.): "GREETING: [friendly response]"
-        - For document questions: "RETRIEVE: [original query]"
-        - For unclear queries: "CLARIFY: Please ask a specific question about the documents."
-        """,
-        agent=query_router,
-        expected_output="Classification of the query with appropriate routing decision",
-    )
-
-    greeting_task = Task(
-        description="""Handle greetings and clarifications based on the routing decision:
-
-        - If routing decision starts with 'GREETING:', return the greeting message directly
-        - If routing decision starts with 'CLARIFY:', return the clarification message directly  
-        - If routing decision starts with 'RETRIEVE:', return "NEEDS_RETRIEVAL"
-        
-        You have no tools available - just process the routing decision appropriately.""",
-        agent=greeting_handler,
-        expected_output="Greeting response, clarification message, or 'NEEDS_RETRIEVAL' indicator",
-        context=[routing_task]
-    )
-
+def create_rag_crew(smart_retriever, answer_generator):
+    """Create optimized RAG crew - reduced from 4 to 2 tasks for speed."""
+    
+    # TASK 1: Smart Retrieval (handles routing + retrieval in one step)
     retrieval_task = Task(
-        description="""Only execute if the greeting handler returned 'NEEDS_RETRIEVAL':
-        
-        Use pg_retriever_tool to search for relevant document chunks for the query: {query}
-        
-        If greeting handler did NOT return 'NEEDS_RETRIEVAL', skip this task.""",
-        agent=document_retriever,
-        expected_output="Retrieved document chunks with source information and metadata, or empty if not needed",
-        context=[routing_task, greeting_task]
+        description="""Handle the user query efficiently: {query}
+
+        DECISION LOGIC:
+        1. If query is a simple greeting (hi, hello, good morning, how are you):
+           - Respond directly with a friendly greeting
+           - DO NOT use pg_retriever_tool
+           - Example: "Hello! I'm here to help you with document questions."
+
+        2. If query asks for specific information (policies, procedures, facts):
+           - Use pg_retriever_tool to search for relevant document chunks
+           - Return the retrieved information for the next agent to process
+
+        3. If query is unclear or too vague:
+           - Ask for clarification without using tools
+           - Example: "Could you please ask a more specific question about the documents?"
+
+        Be efficient - handle simple cases directly, use tools only when needed.""",
+        agent=smart_retriever,
+        expected_output="Direct response for greetings/clarifications, or retrieved document chunks for factual queries"
     )
 
+    # TASK 2: Answer Generation (streamlined)
     answer_task = Task(
-        description="""Generate the final response with ZERO creativity and STRICT document adherence:
+        description="""Generate the final response based on the retrieval results: {query}
 
-        STEP 1: Examine the retrieved document chunks from the previous task
-        STEP 2: Look for ANY information relevant to the query: {query}
-        STEP 3: If relevant information exists, use it to answer (even if partial)
-
-        RESPONSE TYPES:
-
-        1. GREETING RESPONSES (routing starts with 'GREETING:'):
-           - Return the exact greeting message from the routing decision
-           - NO modifications or additions
+        PROCESSING LOGIC:
+        1. If the previous task returned a direct response (greeting/clarification):
+           - Use that response as-is
            
-        2. CLARIFICATION RESPONSES (routing starts with 'CLARIFY:'):
-           - Return the exact clarification message from routing
-           - NO modifications or additions
-           
-        3. DOCUMENT-BASED RESPONSES (routing starts with 'RETRIEVE:'):
-           - FIRST: Examine the retrieved document chunks carefully
-           - IF chunks contain ANY relevant information, use it to answer the question
-           - Quote directly from documents when possible
-           - NEVER add information not present in the retrieved chunks
-           - NEVER use general knowledge, assumptions, or inferences
-           - ONLY say "I don't have enough information" if chunks are completely empty or totally irrelevant
-           - Always cite: "According to [Document Name], page [X]: [exact quote or information]"
-           - If partial information is available, provide what you can find and cite sources
+        2. If the previous task retrieved document chunks:
+           - Extract relevant information from the chunks
+           - Quote directly from documents: "According to [Document], page [X]: [information]"
+           - Cite all sources used
+           - If no relevant information found, say "I don't have information about that in the available documents."
 
-        CRITICAL REQUIREMENTS:
-        - Temperature = 0 (no creativity)
-        - Stick to facts explicitly stated in documents
-        - Never expand beyond retrieved content
-        - Never make logical connections not explicitly stated
-        - Quote exact text when possible
-        
-        Query to answer: {query}
-        """,
-        agent=answer_agent,
-        expected_output="Exact document-based response with zero creativity and strict source adherence",
-        context=[routing_task, greeting_task, retrieval_task]
+        REQUIREMENTS:
+        - Only use information explicitly stated in retrieved documents
+        - Never add external knowledge or make assumptions
+        - Keep responses concise and factual
+        - Always provide source citations for document-based answers""",
+        agent=answer_generator,
+        expected_output="Final response - either direct greeting/clarification or document-based answer with citations",
+        context=[retrieval_task]
     )
 
+    # Create optimized crew with minimal overhead
     crew = Crew(
-        agents=[query_router, greeting_handler, document_retriever, answer_agent],
-        tasks=[routing_task, greeting_task, retrieval_task, answer_task],
+        agents=[smart_retriever, answer_generator],
+        tasks=[retrieval_task, answer_task],
         process=Process.sequential,
-        verbose=True,
+        verbose=False,  # Reduced verbosity for speed
+        memory=False,   # Disable memory for faster processing
+        max_iter=1      # Prevent unnecessary iterations
     )
 
     return crew
