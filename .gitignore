@@ -4,4 +4,4 @@ logs
 __pycache__
 .DS_Store
 .rgvenv
-env.docker
+.env.docker

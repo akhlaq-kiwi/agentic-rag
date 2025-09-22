@@ -47,21 +47,52 @@ docker compose --profile ingestion up ingestion
 ## Advanced Usage
 
 ### Run Evaluation
+
+⚠️ **Prerequisites**: RAGAS evaluation requires an OpenAI API key.
+
+#### 1. Setup OpenAI API Key
+```bash
+# Set your OpenAI API key (required for RAGAS evaluation)
+export OPENAI_API_KEY=your-openai-api-key-here
+
+# Or add to .env file
+echo "OPENAI_API_KEY=your-openai-api-key-here" >> .env
+
+# Test API connectivity (optional but recommended)
+python test_openai_connection.py
+```
+
+#### 2. Run Evaluation
 ```bash
 # Run RAGAS evaluation with default small dataset
-docker compose --profile evaluation up evaluation
+OPENAI_API_KEY=$OPENAI_API_KEY docker compose --profile evaluation up evaluation
 
 # Run evaluation with large dataset
-EVALUATION_DATASET=large_dataset.jsonl docker compose --profile evaluation up evaluation
+EVALUATION_DATASET=large_dataset.jsonl OPENAI_API_KEY=$OPENAI_API_KEY docker compose --profile evaluation up evaluation
 
 # Run evaluation with custom dataset
-EVALUATION_DATASET=my_custom_dataset.jsonl docker compose --profile evaluation up evaluation
+EVALUATION_DATASET=my_custom_dataset.jsonl OPENAI_API_KEY=$OPENAI_API_KEY docker compose --profile evaluation up evaluation
 
 # View evaluation results
 ls -la evaluation_results/
 
 # View specific evaluation result
 cat evaluation_results/ragas_evaluation_small_dataset_*.json
+```
+
+#### 3. Troubleshooting Evaluation
+If you encounter OpenAI API errors:
+```bash
+# Test your API key
+python test_openai_connection.py
+
+# Check evaluation logs
+docker compose logs evaluation
+
+# Common issues:
+# - Invalid API key: Verify your key at https://platform.openai.com/api-keys
+# - Insufficient credits: Check your OpenAI account balance
+# - Rate limiting: Wait and retry, or upgrade your plan
 ```
 
 ### Development Mode

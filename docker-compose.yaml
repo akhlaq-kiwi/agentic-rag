@@ -135,6 +135,7 @@ services:
       - PHOENIX_PROJECT_NAME=ragas-evaluation
       - SOURCE_DATA_PATH=data
       - EVALUATION_DATASET=${EVALUATION_DATASET:-small_dataset.jsonl}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - ./src:/app/src
       - ./data:/app/data

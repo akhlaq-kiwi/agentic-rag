@@ -27,22 +27,21 @@ def save_evaluation_results(results, dataset_name: str, results_dir: Path):
     """Save evaluation results to CSV file, appending each run."""
     csv_filename = "results.csv"
     csv_filepath = results_dir / csv_filename
-
-    # Convert results to dict if needed
-    if hasattr(results, 'to_dict'):
-        results_dict = results.to_dict()
-    elif hasattr(results, '__dict__'):
-        results_dict = results.__dict__
-    else:
-        results_dict = {"results": str(results)}
+    # print(results)
+    # # Convert results to dict if needed
+    # if hasattr(results, 'to_dict'):
+    #     results_dict = results.to_dict()
+    # elif hasattr(results, '__dict__'):
+    #     results_dict = results.__dict__
+    # else:
+    #     results_dict = {"results": str(results)}
 
     # Add metadata
-    results_dict["dataset"] = dataset_name
-    results_dict["timestamp"] = timestamp
-    results_dict["evaluation_date"] = datetime.now().isoformat()
+    results["dataset"] = dataset_name
+    results["evaluation_date"] = datetime.now().isoformat()
 
     # Prepare row for CSV
-    row = results_dict
+    row = results
 
     # Write header only if file does not exist
     write_header = not csv_filepath.exists()
@@ -81,11 +80,9 @@ async def main():
         # Run evaluation
         results = await raga_runner(args.dataset)
         
-        # Save results if requested
-        if args.save_results:
-            results_dir = setup_results_directory()
-            save_evaluation_results(results, args.dataset, results_dir)
-        
+        results_dir = setup_results_directory()
+        save_evaluation_results(results, args.dataset, results_dir)
+    
         print("=" * 60)
         print("✅ Evaluation completed successfully!")
         return results

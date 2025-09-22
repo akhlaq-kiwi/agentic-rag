@@ -14,7 +14,14 @@ from dotenv import load_dotenv
 from src.rag.crew import run_rag_query
 from src.config import (EVALUATION_DATA_PATH, OPENAI_API_KEY)
 
+# Validate and set OpenAI API key
+if not OPENAI_API_KEY or OPENAI_API_KEY.strip() == "":
+    print("❌ Error: OPENAI_API_KEY is not set or is empty!")
+    print("Please set your OpenAI API key in the environment variables or .env file")
+    sys.exit(1)
+
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+print(f"✅ OpenAI API key configured (key starts with: {OPENAI_API_KEY[:10]}...)")
 
 class RagasEvaluator:
     """
@@ -142,15 +149,28 @@ class RagasEvaluator:
         Returns:
             Any: The RAGAS evaluation results.
         """
-        print("Evaluating the results with RAGAS...")
+        print("🔄 Evaluating the results with RAGAS...")
+        print("📊 This may take a few minutes depending on dataset size and OpenAI API response times...")
         
-        # Run the evaluation
-        result = evaluate(
-            dataset=eval_dataset,
-            metrics=self.metrics,
-        )
-        
-        return result
+        try:
+            # Run the evaluation
+            result = evaluate(
+                dataset=eval_dataset,
+                metrics=self.metrics,
+                raise_exceptions=True  # Enable detailed error reporting
+            )
+            
+            print("✅ RAGAS evaluation completed successfully!")
+            return result
+            
+        except Exception as e:
+            print(f"❌ RAGAS evaluation failed: {e}")
+            print("💡 This might be due to:")
+            print("   - OpenAI API key issues")
+            print("   - Network connectivity problems") 
+            print("   - Rate limiting from OpenAI")
+            print("   - Invalid data format in the dataset")
+            raise
     
     async def run_evaluation(self) -> Any:
         """
@@ -191,4 +211,4 @@ async def raga_runner(dataset: str):
     # Initialize the evaluator
     evaluator = RagasEvaluator(dataset = dataset)
     # Run the evaluation
-    await evaluator.run_evaluation()
+    return await evaluator.run_evaluation()
