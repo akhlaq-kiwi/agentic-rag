@@ -16,7 +16,7 @@ def create_rag_agents():
         model=f"ollama/{LLM}",
         base_url=OLLAMA_BASE_URL,
         request_timeout=60.0,  # Reduced from 120s
-        temperature=0.5,  # Lower temperature for more deterministic responses
+        temperature=0,  # Lower temperature for more deterministic responses
         max_tokens=512  # Reduced max tokens for faster responses
     )
     
@@ -67,7 +67,8 @@ def create_rag_agents():
         - Only use information explicitly stated in retrieved documents
         - Never add external knowledge or assumptions
         - Keep responses concise and factual
-        - Always provide source citations""",
+        - Always provide source citations towards the end of your response if the query is not greetings
+        - In case of citations, use the format: [Document Title, Page X]""",
         llm=llm,
         verbose=False,  # Reduced verbosity for speed
         allow_delegation=False

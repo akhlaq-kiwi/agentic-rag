@@ -1,38 +1,57 @@
 # main.py
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any, Union
-from src.rag.crew import run_rag_query
-from src.config import OLLAMA_BASE_URL
 import logging
 import os
 import json
 import time
 import asyncio
 from datetime import datetime
-from phoenix.otel import register
-from src.config import PHOENIX_COLLECTOR_ENDPOINT, PHOENIX_PROJECT_NAME
+
+# Set up logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Load config early to get Phoenix settings
+from src.config import OLLAMA_BASE_URL, PHOENIX_COLLECTOR_ENDPOINT, PHOENIX_PROJECT_NAME
 
 # Set environment variable for LiteLLM to use Ollama
 os.environ["OLLAMA_API_BASE"] = OLLAMA_BASE_URL
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+# Phoenix Tracing Setup - MUST BE BEFORE OTHER IMPORTS
+phoenix_endpoint = PHOENIX_COLLECTOR_ENDPOINT or "http://phoenix:6006"
+os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = phoenix_endpoint
 
 try:
     from phoenix.otel import register
+    import requests
+    
+    # Test Phoenix connectivity first
+    try:
+        response = requests.get(f"{phoenix_endpoint}/healthz", timeout=5)
+        logger.info(f"Phoenix connectivity test: {response.status_code}")
+    except Exception as conn_e:
+        logger.warning(f"Phoenix connectivity test failed: {conn_e}")
+    
     tracer_provider = register(
-        project_name=PHOENIX_PROJECT_NAME,
-        endpoint=f"{PHOENIX_COLLECTOR_ENDPOINT}/v1/traces",
+        project_name=PHOENIX_PROJECT_NAME or "default",
+        endpoint=f"{phoenix_endpoint}/v1/traces",
         auto_instrument=True  # This automatically instruments CrewAI and other libraries
     )
-    logging.info(f"Arize Phoenix tracing successfully initialized for API server at {PHOENIX_COLLECTOR_ENDPOINT}")
+    logger.info(f"✅ Arize Phoenix tracing successfully initialized at {phoenix_endpoint}")
 except ImportError as e:
-    logging.warning(f"Phoenix module not found: {e}. Install with: pip install arize-phoenix")
+    logger.warning(f"Phoenix module not found: {e}. Install with: pip install arize-phoenix")
 except Exception as e:
-    logging.warning(f"Could not initialize Arize Phoenix tracing: {e}")
+    logger.warning(f"⚠️ Could not initialize Arize Phoenix tracing: {e}")
+
+# Now import other modules after tracing is set up
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+from src.rag.crew import run_rag_query
+
+# Import OpenTelemetry tracing tools for manual spans
+from opentelemetry import trace
+tracer = trace.get_tracer(__name__)
 
 app = FastAPI(title="Agentic RAG API", description="OpenAI-compatible RAG API for OpenWebUI")
 
@@ -106,56 +125,73 @@ async def list_models():
 @app.post("/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     """OpenAI-compatible chat completions endpoint"""
-    if not rag_crew:
-        raise HTTPException(status_code=503, detail="RAG system not initialized")
     
-    # Extract the last user message
-    user_messages = [msg for msg in request.messages if msg.role == "user"]
-    if not user_messages:
-        raise HTTPException(status_code=400, detail="No user message found")
-    
-    question = user_messages[-1].content
-    
-    try:
-        # Process with RAG crew
-        logger.info(f"Processing query: {question}")
-        result = run_rag_query(question)
-        answer = str(result)
+    with tracer.start_as_current_span("chat_completions") as span:
+        if not rag_crew:
+            span.set_attribute("error", "RAG system not initialized")
+            raise HTTPException(status_code=503, detail="RAG system not initialized")
         
-        if request.stream:
-            return StreamingResponse(
-                generate_stream_response(answer, request.model),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "*"
-                }
-            )
-        else:
-            return ChatCompletionResponse(
-                id=f"chatcmpl-{int(time.time())}",
-                object="chat.completion",
-                created=int(time.time()),
-                model=request.model,
-                choices=[{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": answer
-                    },
-                    "finish_reason": "stop"
-                }],
-                usage={
-                    "prompt_tokens": len(question.split()),
-                    "completion_tokens": len(answer.split()),
-                    "total_tokens": len(question.split()) + len(answer.split())
-                }
-            ).dict()
-    except Exception as e:
-        logger.error(f"Error processing chat completion: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+        # Extract the last user message
+        user_messages = [msg for msg in request.messages if msg.role == "user"]
+        if not user_messages:
+            span.set_attribute("error", "No user message found")
+            raise HTTPException(status_code=400, detail="No user message found")
+        
+        question = user_messages[-1].content
+        span.set_attribute("user.query", question)
+        span.set_attribute("request.model", request.model)
+        span.set_attribute("request.stream", request.stream)
+        
+        try:
+            # Process with RAG crew
+            logger.info("Processing query: %s", question)
+            
+            with tracer.start_as_current_span("rag_query_processing") as rag_span:
+                rag_span.set_attribute("query", question)
+                result = run_rag_query(question)
+                answer = str(result)
+                rag_span.set_attribute("response_length", len(answer))
+                
+            span.set_attribute("response.length", len(answer))
+            span.set_attribute("success", True)
+            
+            if request.stream:
+                return StreamingResponse(
+                    generate_stream_response(answer, request.model),
+                    media_type="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Headers": "*"
+                    }
+                )
+            else:
+                return ChatCompletionResponse(
+                    id=f"chatcmpl-{int(time.time())}",
+                    object="chat.completion",
+                    created=int(time.time()),
+                    model=request.model,
+                    choices=[{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": answer
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    usage={
+                        "prompt_tokens": len(question.split()),
+                        "completion_tokens": len(answer.split()),
+                        "total_tokens": len(question.split()) + len(answer.split())
+                    }
+                ).dict()
+                
+        except Exception as e:
+            span.set_attribute("error", str(e))
+            span.set_attribute("success", False)
+            logger.error("Error processing chat completion: %s", str(e))
+            raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}") from e
 
 async def generate_stream_response(content: str, model: str):
     """Generate streaming response for chat completions"""
@@ -201,9 +237,21 @@ async def generate_stream_response(content: str, model: str):
 # Health check endpoint
 @app.get("/health")
 async def health_check():
+    phoenix_status = "unknown"
+    try:
+        import requests
+        response = requests.get(f"{phoenix_endpoint}/healthz", timeout=3)
+        phoenix_status = "connected" if response.status_code == 200 else "error"
+    except Exception:
+        phoenix_status = "disconnected"
+    
     return {
         "status": "healthy",
         "rag_initialized": rag_crew is not None,
+        "phoenix_tracing": {
+            "endpoint": phoenix_endpoint,
+            "status": phoenix_status
+        },
         "timestamp": datetime.now().isoformat()
     }
 
