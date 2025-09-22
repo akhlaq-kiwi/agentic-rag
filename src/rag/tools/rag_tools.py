@@ -74,7 +74,11 @@ def pg_retriever_tool(query: str) -> str:
                 page_no = metadata.get('page_no', '')
                 if page_no:
                     page_info = f" (Page {page_no})"
-            
+            print("--"*10)
+            print(page_info, source_info)
+            print(content.strip())
+            print("--"*10)
+
             formatted_chunk = f"**Document Chunk {i}** (Score: {score:.3f})\n{source_info}{page_info}\n\nContent:\n{content.strip()}"
             formatted_chunks.append(formatted_chunk)
         
@@ -122,7 +126,7 @@ def perform_hybrid_search(conn, query: str, query_embedding: List[float], top_k:
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # Check which table exists and has data
-            table_name = DATABASE_TABLE
+            table_name = f"data_{DATABASE_TABLE}"
             
             # Check if the configured table exists and has data
             cur.execute(f"""

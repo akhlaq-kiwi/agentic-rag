@@ -16,7 +16,8 @@ def create_rag_agents():
         model=f"ollama/{LLM}",
         base_url=OLLAMA_BASE_URL,
         request_timeout=60.0,  # Reduced from 120s
-        temperature=0.0
+        temperature=0.5,  # Lower temperature for more deterministic responses
+        max_tokens=512  # Reduced max tokens for faster responses
     )
     
     # AGENT 1: Smart Retriever (combines routing + retrieval)

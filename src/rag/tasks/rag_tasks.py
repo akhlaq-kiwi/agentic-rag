@@ -12,6 +12,7 @@ def create_rag_crew(smart_retriever, answer_generator):
         1. If query is a simple greeting (hi, hello, good morning, how are you):
            - Respond directly with a friendly greeting
            - DO NOT use pg_retriever_tool
+           - Just greet the user and DO NOT reference documents
            - Example: "Hello! I'm here to help you with document questions."
 
         2. If query asks for specific information (policies, procedures, facts):
@@ -34,6 +35,7 @@ def create_rag_crew(smart_retriever, answer_generator):
         PROCESSING LOGIC:
         1. If the previous task returned a direct response (greeting/clarification):
            - Use that response as-is
+           - Dont not provide docuemnt reference in this case.
            
         2. If the previous task retrieved document chunks:
            - Extract relevant information from the chunks
@@ -45,7 +47,7 @@ def create_rag_crew(smart_retriever, answer_generator):
         - Only use information explicitly stated in retrieved documents
         - Never add external knowledge or make assumptions
         - Keep responses concise and factual
-        - Always provide source citations for document-based answers""",
+        - Always provide source citations for document-based answers if the "{query}" is not greetings""",
         agent=answer_generator,
         expected_output="Final response - either direct greeting/clarification or document-based answer with citations",
         context=[retrieval_task]

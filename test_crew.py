@@ -1,7 +1,7 @@
 from src.rag.crew import run_rag_query
 
 # Test with optimized RAG crew
-user_message = "Explain 2.10.2 'SAP Ariba - Core Administration' Overview?"
+user_message = "What is RACI Matrix?"
 
 print("🚀 Testing Optimized RAG Crew...")
 print(f"Query: {user_message}")
