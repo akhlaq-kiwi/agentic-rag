@@ -152,7 +152,7 @@ async def chat_completions(request: ChatCompletionRequest):
             conversation_context = conversation_memory.get_context(session_id)
             
             # Enhance question with conversation history if available
-            enhanced_question = f"Conversational context: {conversation_context}\nCurrent question: {question}" if conversation_context else question
+            enhanced_question = f"{question}<-->{conversation_context}" if conversation_context else question
 
             # Process with RAG crew
             logger.info("Processing query: %s", question)

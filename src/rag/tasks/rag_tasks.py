@@ -1,66 +1,78 @@
 # src/tasks/rag_tasks.py - OPTIMIZED VERSION
 from crewai import Task, Crew, Process
+from ..agents.rag_agent import document_researcher, insight_synthesizer, query_analyzer
 
-def create_rag_crew(smart_retriever, answer_generator):
-    """Create optimized RAG crew - reduced from 4 to 2 tasks for speed."""
-    
-    # TASK 1: Smart Retrieval (handles routing + retrieval in one step)
-    retrieval_task = Task(
-        description="""Handle the user query efficiently: {query}
+def create_rag_crew(query: str):
+      parts = query.split("<-->")
+      query = parts[0]
+      context = parts[1] if len(parts) > 1 else ""
+      
+      """
+      Creates and configures a two-agent RAG crew to process a query.
+      - The Document Researcher finds relevant information.
+      - The Insight Synthesizer formulates the final answer based on the retrieved context.
+      """
 
-        DECISION LOGIC:
-        1. If query is a simple greeting (hi, hello, good morning, how are you):
-           - Respond directly with a friendly greeting
-           - DO NOT use pg_retriever_tool
-           - Just greet the user and DO NOT reference documents
-           - Example: "Hello! I'm here to help you with document questions."
+      query_analyzer_task = Task(
+        name="Query Analyzer Task",
+        description=f"Analyze the user's query to determine the best approach for information retrieval for the query: '{query}'.",
+        expected_output="A string indicating the type of query: 'greeting', 'chat_history', or 'question'.",
+        agent=query_analyzer
+      )
 
-        2. If query asks for specific information (policies, procedures, facts):
-           - Use pg_retriever_tool to search for relevant document chunks
-           - Return the retrieved information for the next agent to process
+      # Task for the Document Researcher agent
+      # This task focuses exclusively on using the tool to find information.
+      research_task = Task(
+         name="Document Researcher Task",
+         description=(
+            f"Given the user query: '{query}', decide the appropriate response "
+            "based on the analysis from the 'Query Analyzer Task'."
+         ),
+         expected_output=f"""
+         - If Query Analyzer Task → intent = 'greeting':
+            Return only a concise and friendly greeting message.
+            Do not invoke any tools or search documents.
 
-        3. If query is unclear or too vague:
-           - Ask for clarification without using tools
-           - Example: "Could you please ask a more specific question about the documents?"
+         - If Query Analyzer Task → intent = 'chat_history':
+            Retrieve and return the most relevant answer from the "{context}".
+            Do not perform document search or other tasks.
 
-        Be efficient - handle simple cases directly, use tools only when needed.""",
-        agent=smart_retriever,
-        expected_output="Direct response for greetings/clarifications, or retrieved document chunks for factual queries"
-    )
+         - If Query Analyzer Task → intent = 'question':
+            Return a structured response that includes:
+               1. A block of text containing the most relevant chunks from policy and standards documents.
+               2. For each chunk, include its source file name (and page number if available).
+               3. Ensure the text is directly extracted, not paraphrased, so it can be cited as evidence.
+         """,
+         agent=document_researcher
+      )
+      # Task for the Insight Synthesizer agent
+      # This task takes the context from the first task and focuses on crafting the answer.
+      synthesis_task = Task(
+            name="Insight Synthesizer Task",
+            description=f"Analyze the provided document context from 'Document Researcher Task' and formulate a comprehensive and accurate answer to the user's original question: '{query}'.",
+            expected_output="""A professional, well-structured response that directly answers the user's question. Format the response naturally and appropriately based on the content:
 
-    # TASK 2: Answer Generation (streamlined)
-    answer_task = Task(
-        description="""Generate the final response based on the retrieval results: {query}
+            Guidelines for response formatting:
+            - Start with a clear, direct answer to the question
+            - Provide supporting details, explanations, or calculations only when relevant
+            - Include specific references to policy articles, sections, or documents when citing sources
+            - Use natural language flow rather than rigid templates
+            - Adapt the structure to fit the content (simple answers for simple questions, detailed breakdowns for complex ones)
+            - Use proper formatting (bullet points, numbering, or paragraphs) as appropriate for the content
+            - Ensure professional tone and clarity
+            - Include precise figures, timeframes, and regulatory references where applicable
 
-        PROCESSING LOGIC:
-        1. If the previous task returned a direct response (greeting/clarification):
-           - Use that response as-is
-           - Dont not provide docuemnt reference in this case.
-           
-        2. If the previous task retrieved document chunks:
-           - Extract relevant information from the chunks
-           - Quote directly from documents: "According to [Document], page [X]: [information]"
-           - Cite all sources used
-           - If no relevant information found, say "I don't have information about that in the available documents."
+            The response should feel conversational yet authoritative, avoiding repetitive headers unless the content genuinely requires structured breakdown.""",
+         agent=insight_synthesizer,
+         context=[research_task]
+      )
 
-        REQUIREMENTS:
-        - Only use information explicitly stated in retrieved documents
-        - Never add external knowledge or make assumptions
-        - Keep responses concise and factual
-        - Always provide source citations for document-based answers if the "{query}" is not greetings""",
-        agent=answer_generator,
-        expected_output="Final response - either direct greeting/clarification or document-based answer with citations",
-        context=[retrieval_task]
-    )
+      # Create the crew with a sequential process
+      rag_crew = Crew(
+         agents=[query_analyzer, document_researcher, insight_synthesizer],
+         tasks=[query_analyzer_task, research_task, synthesis_task],
+         process=Process.sequential, # The tasks will be executed one after the other
+         verbose=True
+      )
 
-    # Create optimized crew with minimal overhead
-    crew = Crew(
-        agents=[smart_retriever, answer_generator],
-        tasks=[retrieval_task, answer_task],
-        process=Process.sequential,
-        verbose=False,  # Reduced verbosity for speed
-        memory=False,   # Disable memory for faster processing
-        max_iter=1      # Prevent unnecessary iterations
-    )
-
-    return crew
+      return rag_crew

@@ -11,7 +11,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-@tool
+@tool("pg_retriever_tool")
 def pg_retriever_tool(query: str) -> str:
     """Retrieve relevant chunks from pgvector using direct PostgreSQL queries with hybrid search.
     
@@ -84,7 +84,7 @@ def pg_retriever_tool(query: str) -> str:
         
         result_text = "\n\n" + ("="*50 + "\n\n").join(formatted_chunks)
         print(f"DEBUG: Retrieved {len(results)} chunks")
-        
+        print(result_text)
         return result_text
         
     except Exception as e:
