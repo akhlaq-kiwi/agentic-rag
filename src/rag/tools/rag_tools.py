@@ -58,9 +58,11 @@ def pg_retriever_tool(query: str) -> str:
         if not results:
             return "No relevant documents found for this query."
         
-        # Format results
+        # Format results with proper source attribution
         formatted_chunks = []
+        
         for i, (content, metadata, score) in enumerate(results, 1):
+            # Extract source information
             source_info = "Unknown source"
             page_info = ""
             
@@ -68,22 +70,26 @@ def pg_retriever_tool(query: str) -> str:
                 # Extract file name
                 file_name = metadata.get('file_name', metadata.get('source', ''))
                 if file_name:
-                    source_info = f"Source: {file_name}"
+                    source_info = file_name
                 
                 # Extract page number
                 page_no = metadata.get('page_no', '')
                 if page_no:
                     page_info = f" (Page {page_no})"
-            print("--"*10)
-            print(page_info, source_info)
-            print(content.strip())
-            print("--"*10)
+            
+            # Format each chunk with clear source attribution
+            formatted_chunk = f"""**Document Chunk {i}** (Relevance: {score:.3f})
+Source: {source_info}{page_info}
 
-            formatted_chunk = f"**Document Chunk {i}** (Score: {score:.3f})\n{source_info}{page_info}\n\nContent:\n{content.strip()}"
+Content:
+{content.strip()}"""
+            
             formatted_chunks.append(formatted_chunk)
         
-        result_text = "\n\n" + ("="*50 + "\n\n").join(formatted_chunks)
-        print(f"DEBUG: Retrieved {len(results)} chunks")
+        # Join all chunks with clear separators
+        result_text = "\n\n" + ("\n" + "="*80 + "\n\n").join(formatted_chunks)
+        
+        print(f"DEBUG: Retrieved {len(results)} chunks with source metadata")
         print(result_text)
         return result_text
         

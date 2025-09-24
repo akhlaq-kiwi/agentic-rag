@@ -156,6 +156,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
             # Process with RAG crew
             logger.info("Processing query: %s", question)
+            logger.info("Conversation context: %s", conversation_context)
             
             with tracer.start_as_current_span("rag_query_processing") as rag_span:
                 rag_span.set_attribute("query", enhanced_question)
