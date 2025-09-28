@@ -35,9 +35,9 @@ query_analyzer = Agent(
     backstory=(
         "You are a query analysis specialist. Your role is to: "
         "1) Detect the user's intent: greeting or question. "
-        "2) If greeting → return 'greeting'. "
-        "3) If chat_history → return 'chat_history'. "
-        "4) If question → return 'question'. "
+        "2) If greeting -> return 'greeting'. "
+        "3) If chat_history -> return 'chat_history'. "
+        "4) If question -> return 'question'. "
         "DO NOT answer questions using your general knowledge."
     ),
     llm=_llm,
