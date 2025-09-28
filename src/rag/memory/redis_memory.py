@@ -29,8 +29,9 @@ class ConversationMemory:
             return
         
         key = f"chat:{session_id}"
-        conversation = {"user": user_msg, "assistant": assistant_msg}
-        
+        #conversation = {"user": user_msg, "assistant": assistant_msg}
+        conversation = {user_msg}
+
         try:
             # Add to list and keep only last 5
             self.redis.lpush(key, json.dumps(conversation))

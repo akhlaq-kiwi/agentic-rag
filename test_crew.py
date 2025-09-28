@@ -2,7 +2,7 @@ from src.rag.crew import run_rag_query
 from src.prompts.prompt_manager import get_prompt
 
 # # Test with optimized RAG crew
-user_message = "What is RACI Matrix?"
+user_message = "List out 10 core principles established by the Abu Dhabi Procurement Standards?"
 
 print("🚀 Testing Optimized RAG Crew...")
 print(f"Query: {user_message}")

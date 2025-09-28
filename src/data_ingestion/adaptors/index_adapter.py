@@ -196,7 +196,9 @@ class LlamaIndexAdapter(BaseIndexer):
                 
                 # Conditionally enrich content and metadata with LLM context
                 if self.enable_context_enrichment:
-                    enriched_content, enriched_meta = self._enrich_with_context(content, meta)
+                    enriched_content, enriched_meta = self._enrich_with_context(content, meta, whole_document_text=page_text)
+                    print(f"Processed chunk {i}/{len(chunks)} on page {page_no} of {file_name}")
+                    print(enriched_meta.get("context_summary", "No context"))
                 else:
                     enriched_content, enriched_meta = content, meta
                 
@@ -214,17 +216,16 @@ class LlamaIndexAdapter(BaseIndexer):
 
         return nodes
     
-    def _enrich_with_context(self, content: str, metadata: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    def _enrich_with_context(self, content: str, metadata: Dict[str, Any], whole_document_text: str) -> Tuple[str, Dict[str, Any]]:
         """Use LLM to add context to text content and metadata."""
         try:
             # Truncate content for faster processing
-            truncated_content = content[:300] if len(content) > 300 else content
+            truncated_content = content
             
             # Create a more concise context prompt
             context_prompt = f"""Summarize key topics in 1 sentence:
-
-            Text: {truncated_content}
-            File: {metadata.get('file_name', 'Unknown')}
+            For the Text: {truncated_content}
+            From Whole Document Text: {whole_document_text}
 
             Summary:"""
             

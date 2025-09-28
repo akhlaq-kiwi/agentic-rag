@@ -26,7 +26,7 @@ COPY .env.docker .env
 RUN mkdir -p /app/data/raw /app/data/processed
 
 # Set environment variables for PDF processing
-ENV PDF_EXTRACTOR=simple_pdf
+ENV PDF_EXTRACTOR=docling
 
 # Run the ingestion pipeline
 CMD ["python", "main.py"]

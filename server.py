@@ -124,90 +124,38 @@ async def list_models():
 
 @app.post("/v1/chat/completions")
 @app.post("/chat/completions")
-async def chat_completions(request: ChatCompletionRequest):
+def chat_completions(request: ChatCompletionRequest):
     """OpenAI-compatible chat completions endpoint"""
+    print(request.messages)
+    # Extract the last user message as the query
+    user_message = next((msg.content for msg in reversed(request.messages) if msg.role == "user"), None)
     
-    with tracer.start_as_current_span("chat_completions") as span:
-        if not rag_crew:
-            span.set_attribute("error", "RAG system not initialized")
-            raise HTTPException(status_code=503, detail="RAG system not initialized")
-        
-        # Extract the last user message
-        user_messages = [msg for msg in request.messages if msg.role == "user"]
-        if not user_messages:
-            span.set_attribute("error", "No user message found")
-            raise HTTPException(status_code=400, detail="No user message found")
-        
-        question = user_messages[-1].content
-        span.set_attribute("user.query", question)
-        span.set_attribute("request.model", request.model)
-        span.set_attribute("request.stream", request.stream)
-        
-        # Use model name as session ID for conversation memory
-        # Use OpenWebUI's chat_id as session_id if present in request
-        session_id = getattr(request, "chat_id", None) or request.model or "default"
-        
-        try:
-            # Get conversation context from Redis memory
-            conversation_context = conversation_memory.get_context(session_id)
-            
-            # Enhance question with conversation history if available
-            enhanced_question = f"{question}<-->{conversation_context}" if conversation_context else question
+    # Use OpenWebUI's chat_id as session_id if present in request
+    print(f"Received query for API: {user_message}")
 
-            # Process with RAG crew
-            logger.info("Processing query: %s", question)
-            logger.info("Conversation context: %s", conversation_context)
-            
-            with tracer.start_as_current_span("rag_query_processing") as rag_span:
-                rag_span.set_attribute("query", enhanced_question)
-                result = run_rag_query(enhanced_question)
-                answer = str(result)
-                rag_span.set_attribute("response_length", len(answer))
-                
-            # Store conversation in Redis memory for future context
-            conversation_memory.add_conversation(session_id, question, answer)
-            logger.info("Stored conversation in Redis for session: %s", session_id)
-                
-            span.set_attribute("response.length", len(answer))
-            span.set_attribute("success", True)
-            
-            if request.stream:
-                return StreamingResponse(
-                    generate_stream_response(answer, request.model),
-                    media_type="text/event-stream",
-                    headers={
-                        "Cache-Control": "no-cache",
-                        "Connection": "keep-alive",
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Headers": "*"
-                    }
-                )
-            else:
-                return ChatCompletionResponse(
-                    id=f"chatcmpl-{int(time.time())}",
-                    object="chat.completion",
-                    created=int(time.time()),
-                    model=request.model,
-                    choices=[{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": answer
-                        },
-                        "finish_reason": "stop"
-                    }],
-                    usage={
-                        "prompt_tokens": len(question.split()),
-                        "completion_tokens": len(answer.split()),
-                        "total_tokens": len(question.split()) + len(answer.split())
-                    }
-                ).dict()
-                
-        except Exception as e:
-            span.set_attribute("error", str(e))
-            span.set_attribute("success", False)
-            logger.error("Error processing chat completion: %s", str(e))
-            raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}") from e
+    result = run_rag_query(user_message)
+    
+    # Format the response to be compatible with the OpenAI API standard
+    response = {
+        "id": "chatcmpl-123", # Dummy ID
+        "object": "chat.completion",
+        "created": 1677652288, # Dummy timestamp
+        "model": request.model,
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": str(result), # Ensure the result is a string
+            },
+            "finish_reason": "stop"
+        }],
+        "usage": {
+            "prompt_tokens": 0, # You can implement token counting if needed
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
+    }
+    return response
 
 async def generate_stream_response(content: str, model: str):
     """Generate streaming response for chat completions"""

@@ -11,6 +11,7 @@ from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.core import StorageContext, VectorStoreIndex
 from src.data_ingestion.base.base_indexer import BaseIndexer
+from src.config import DIM
 
 
 class DocumentIndexer:
@@ -55,7 +56,8 @@ class PgVectorIndexer:
             schema_name=schema_name,
             table_name=table_name,
             collection_name=collection_name,
-            # embed_dim inferred automatically from embedding model
+            dim=DIM,
+            cosine_similarity_metric=True,
         )
 
     def upsert_nodes(self, nodes: List[TextNode]) -> VectorStoreIndex:
