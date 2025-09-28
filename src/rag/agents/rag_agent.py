@@ -9,8 +9,13 @@ from src.prompts.prompt_manager import get_prompt
 
 # Set environment variable for LiteLLM to use Ollama
 os.environ["OLLAMA_API_BASE"] = OLLAMA_BASE_URL
-insight_synthesizer_backstory_prompt = get_prompt("insight_synthesizer_backstory")
-
+insight_synthesizer_backstory_prompt = ""
+try:
+    insight_synthesizer_backstory_prompt = get_prompt("insight_synthesizer_backstory")
+    insight_synthesizer_backstory_prompt = insight_synthesizer_backstory_prompt.format().messages[0]['content']
+except Exception as e:
+    print(e)
+    insight_synthesizer_backstory_prompt = "Response as human readable answer based on the context provided"
     
 # Initialize LLM with faster settings
 _llm = Ollama(
@@ -68,7 +73,7 @@ insight_synthesizer = Agent(
     role='Insight Synthesizer',
     goal='Create clear, professional responses that directly answer user questions with proper source citations.',
     backstory=(
-        insight_synthesizer_backstory_prompt.format().messages[0]['content']
+        insight_synthesizer_backstory_prompt
     ),
     llm=_llm,
     verbose=True,

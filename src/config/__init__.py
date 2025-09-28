@@ -35,7 +35,6 @@ REDIS_HOST=os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT=int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB=int(os.getenv("REDIS_DB", 0))
 CONVERSATION_HISTORY_LIMIT=int(os.getenv("CONVERSATION_HISTORY_LIMIT", 5))
-REDIS_PORT=6379
 
 
 

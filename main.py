@@ -18,7 +18,7 @@ if __name__ == "__main__":
     
     # Step 2: Create vector index
     _indexer = IndexerFactory.get_indexer('llamaindex', 
-                                         enable_context_enrichment=False,  # Set to False to disable
+                                         enable_context_enrichment=True,  # Set to False to disable
                                          context_timeout=30, 
                                          chunk_size=700, chunk_overlap=150,
                                          min_chars=50,
