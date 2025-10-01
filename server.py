@@ -103,7 +103,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from src.rag.crew import run_rag_query
+from src.rag.crew import run_rag_query, run_rag_query_structured
 from src.rag.memory.redis_memory import conversation_memory
 
 # Import OpenTelemetry tracing tools for manual spans
@@ -181,7 +181,7 @@ async def list_models():
 @app.post("/v1/chat/completions")
 @app.post("/chat/completions")
 def chat_completions(request: ChatCompletionRequest):
-    """OpenAI-compatible chat completions endpoint"""
+    """OpenAI-compatible chat completions endpoint with grounding metadata"""
     print(request.messages)
     # Extract the last user message as the query
     user_message = next((msg.content for msg in reversed(request.messages) if msg.role == "user"), None)
@@ -189,19 +189,23 @@ def chat_completions(request: ChatCompletionRequest):
     # Use OpenWebUI's chat_id as session_id if present in request
     print(f"Received query for API: {user_message}")
 
-    result = run_rag_query(user_message)
+    # Use structured response with grounding
+    rag_response = run_rag_query_structured(user_message)
+    
+    # Format response with sources appended
+    formatted_response = rag_response.format_with_sources()
     
     # Format the response to be compatible with the OpenAI API standard
     response = {
         "id": "chatcmpl-123", # Dummy ID
         "object": "chat.completion",
-        "created": 1677652288, # Dummy timestamp
+        "created": int(time.time()),
         "model": request.model,
         "choices": [{
             "index": 0,
             "message": {
                 "role": "assistant",
-                "content": str(result), # Ensure the result is a string
+                "content": formatted_response,
             },
             "finish_reason": "stop"
         }],
@@ -209,6 +213,18 @@ def chat_completions(request: ChatCompletionRequest):
             "prompt_tokens": 0, # You can implement token counting if needed
             "completion_tokens": 0,
             "total_tokens": 0
+        },
+        # Add grounding metadata as custom field
+        "grounding": {
+            "sources": [
+                {
+                    "file_name": s.file_name,
+                    "page_number": s.page_number,
+                    "relevance_score": s.relevance_score
+                }
+                for s in rag_response.grounding.sources
+            ],
+            "total_chunks": rag_response.grounding.total_chunks
         }
     }
     return response

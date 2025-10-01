@@ -19,6 +19,7 @@ from src.config import (
     RETRIEVAL_INITIAL_TOP_K, RETRIEVAL_FINAL_TOP_K, 
     RETRIEVAL_SIMILARITY_CUTOFF, RERANKING_DIVERSITY_WEIGHT
 )
+from src.rag.models import SourceReference, GroundingMetadata, RetrievalResult
 
 from sentence_transformers import CrossEncoder
 import torch
@@ -265,6 +266,142 @@ def pg_retriever_tool(query: str) -> str:
     except Exception as e:
         logger.error(f"Error in pg_retriever_tool: {str(e)}", exc_info=True)
         return f"Error retrieving documents: {str(e)}. This is a system error, not a query issue. Do not retry the tool call."
+
+
+def retrieve_with_grounding(query: str) -> RetrievalResult:
+    """
+    Retrieve relevant chunks and return structured data with grounding metadata.
+    
+    This function returns a structured object containing:
+    - Retrieved chunks with metadata
+    - Source references (file names and page numbers)
+    - Formatted context for LLM
+    
+    Args:
+        query: The search query string
+    
+    Returns:
+        RetrievalResult with chunks, sources, and formatted context
+    """
+    if not query or not str(query).strip():
+        return RetrievalResult(
+            chunks=[],
+            sources=[],
+            formatted_context="Error: Empty query provided."
+        )
+    
+    query = str(query).strip()
+    logger.info(f"retrieve_with_grounding invoked with query: '{query[:100]}...'")
+    
+    try:
+        # Configure embedding model
+        Settings.embed_model = OllamaEmbedding(
+            model_name=EMBEDDING_LLM,
+            base_url=OLLAMA_BASE_URL,
+        )
+
+        # Connect to pgvector
+        vector_store = PGVectorStore.from_params(
+            database=DATABASE_NAME,
+            host=DATABASE_HOST,
+            password=DATABASE_PASSWORD,
+            port=int(DATABASE_PORT),
+            user=DATABASE_USER,
+            schema_name="public",
+            table_name=DATABASE_TABLE,
+            hybrid_search=True,
+            embed_dim=768,
+        )
+
+        # Create retriever
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+        
+        retriever = index.as_retriever(
+            similarity_top_k=RETRIEVAL_INITIAL_TOP_K,
+            similarity_cutoff=RETRIEVAL_SIMILARITY_CUTOFF
+        )
+
+        # Perform search
+        nodes: List[NodeWithScore] = retriever.retrieve(query)
+        logger.info(f"Retrieved {len(nodes)} initial candidates from vector search")
+
+        # Rerank
+        results = rerank(query, nodes, top_k=RETRIEVAL_FINAL_TOP_K, diversity_weight=RERANKING_DIVERSITY_WEIGHT)
+
+        if not results:
+            return RetrievalResult(
+                chunks=[],
+                sources=[],
+                formatted_context="No relevant documents found for this query."
+            )
+
+        # Extract structured data
+        chunks = []
+        sources = []
+        formatted_chunks = []
+
+        for i, r in enumerate(results, 1):
+            node = r.node
+            score = r.score
+            
+            # Handle score
+            if isinstance(score, list):
+                score_value = score[0] if score and isinstance(score[0], (float, int)) else None
+            elif isinstance(score, (float, int)):
+                score_value = score
+            else:
+                score_value = None
+
+            # Extract metadata
+            file_name = node.metadata.get("file_name", node.metadata.get("source", "Unknown source"))
+            page_no = node.metadata.get("page_no", None)
+            
+            # Create source reference
+            if page_no and str(page_no).isdigit():
+                source_ref = SourceReference(
+                    file_name=file_name,
+                    page_number=int(page_no),
+                    chunk_text=node.text.strip(),
+                    relevance_score=float(score_value) if score_value is not None else None
+                )
+                sources.append(source_ref)
+            
+            # Create chunk dict
+            chunk_dict = {
+                "index": i,
+                "text": node.text.strip(),
+                "file_name": file_name,
+                "page_number": int(page_no) if page_no and str(page_no).isdigit() else None,
+                "relevance_score": float(score_value) if score_value is not None else None
+            }
+            chunks.append(chunk_dict)
+            
+            # Format for LLM context
+            page_info = f" (Page {page_no})" if page_no else ""
+            relevance_str = f"{score_value:.3f}" if score_value is not None else "N/A"
+            
+            formatted_chunk = f"""**Document Chunk {i}** (Relevance: {relevance_str})\nSource: {file_name}{page_info}\n\nContent:\n{node.text.strip()}"""
+            formatted_chunks.append(formatted_chunk)
+
+        # Create formatted context
+        formatted_context = "\n\n" + ("\n" + "="*80 + "\n\n").join(formatted_chunks)
+        
+        logger.info(f"retrieve_with_grounding returning {len(results)} chunks with {len(sources)} source references")
+        
+        return RetrievalResult(
+            chunks=chunks,
+            sources=sources,
+            formatted_context=formatted_context
+        )
+
+    except Exception as e:
+        logger.error(f"Error in retrieve_with_grounding: {str(e)}", exc_info=True)
+        return RetrievalResult(
+            chunks=[],
+            sources=[],
+            formatted_context=f"Error retrieving documents: {str(e)}"
+        )
 
 
 def get_ollama_embedding(text: str) -> List[float]:
