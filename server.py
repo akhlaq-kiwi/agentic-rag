@@ -17,30 +17,86 @@ from src.config import OLLAMA_BASE_URL, PHOENIX_COLLECTOR_ENDPOINT, PHOENIX_PROJ
 os.environ["OLLAMA_API_BASE"] = OLLAMA_BASE_URL
 
 # Phoenix Tracing Setup - MUST BE BEFORE OTHER IMPORTS
-phoenix_endpoint = PHOENIX_COLLECTOR_ENDPOINT or "http://phoenix:6006"
-os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = phoenix_endpoint
+phoenix_base_url = PHOENIX_COLLECTOR_ENDPOINT or "http://phoenix:6006"
+
+# Phoenix expects the base URL (UI port), it will automatically use port 4318 for OTLP
+# Set the environment variable for Phoenix to discover
+os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = phoenix_base_url
 
 try:
     from phoenix.otel import register
+    from opentelemetry.sdk.resources import Resource, SERVICE_NAME
     import requests
     
-    # Test Phoenix connectivity first
-    try:
-        response = requests.get(f"{phoenix_endpoint}/healthz", timeout=5)
-        logger.info(f"Phoenix connectivity test: {response.status_code}")
-    except Exception as conn_e:
-        logger.warning(f"Phoenix connectivity test failed: {conn_e}")
+    # Import instrumentation for LlamaIndex, OpenAI, and LiteLLM
+    from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
+    from openinference.instrumentation.openai import OpenAIInstrumentor
     
+    # Try to import LiteLLM instrumentor (CrewAI uses LiteLLM internally)
+    try:
+        from openinference.instrumentation.litellm import LiteLLMInstrumentor
+        has_litellm_instrumentor = True
+    except ImportError:
+        has_litellm_instrumentor = False
+        logger.warning("LiteLLM instrumentor not found - CrewAI LLM calls may not be fully traced")
+    
+    # Test Phoenix UI connectivity
+    try:
+        response = requests.get(f"{phoenix_base_url}/healthz", timeout=5)
+        logger.info(f"✅ Phoenix UI connectivity: {response.status_code}")
+    except Exception as conn_e:
+        logger.warning(f"⚠️ Phoenix UI connectivity test failed: {conn_e}")
+    
+    # Determine OTLP endpoint - use gRPC (port 4317) for better stability
+    # Phoenix HTTP endpoint (4318) has connection reset issues
+    otlp_endpoint = phoenix_base_url.replace(":6006", ":4317").replace(":4318", ":4317")
+    
+    # Register with Phoenix using gRPC endpoint
     tracer_provider = register(
-        project_name=PHOENIX_PROJECT_NAME or "default",
-        endpoint=f"{phoenix_endpoint}/v1/traces",
+        project_name=PHOENIX_PROJECT_NAME or "agentic-rag",
+        endpoint=otlp_endpoint,  # Use gRPC endpoint (port 4317)
+        resource=Resource.create({SERVICE_NAME: "agentic-rag-api"}),
         auto_instrument=True  # This automatically instruments CrewAI and other libraries
     )
-    logger.info(f"✅ Arize Phoenix tracing successfully initialized at {phoenix_endpoint}")
+    
+    # Manually instrument LlamaIndex for detailed LLM traces
+    LlamaIndexInstrumentor().instrument(tracer_provider=tracer_provider)
+    logger.info("   ✅ LlamaIndex instrumented")
+    
+    # Instrument OpenAI-compatible clients (Ollama uses OpenAI API format)
+    OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
+    logger.info("   ✅ OpenAI instrumented")
+    
+    # Instrument LiteLLM if available (CrewAI uses LiteLLM)
+    if has_litellm_instrumentor:
+        LiteLLMInstrumentor().instrument(tracer_provider=tracer_provider)
+        logger.info("   ✅ LiteLLM instrumented (CrewAI support)")
+    
+    logger.info(f"✅ Arize Phoenix tracing initialized")
+    logger.info(f"   Phoenix UI: {phoenix_base_url}")
+    logger.info(f"   OTLP Endpoint: {otlp_endpoint} (gRPC)")
+    logger.info(f"   Project: {PHOENIX_PROJECT_NAME or 'agentic-rag'}")
+    
+    # Create a test span to verify tracing is working
+    from opentelemetry import trace as otel_trace
+    test_tracer = otel_trace.get_tracer(__name__)
+    with test_tracer.start_as_current_span("phoenix_startup_verification") as span:
+        span.set_attribute("service.name", "agentic-rag-api")
+        span.set_attribute("test.type", "startup")
+        span.add_event("Phoenix tracing initialized")
+        logger.info(f"✅ Test span created - check Phoenix UI at {phoenix_base_url.replace(':4317', ':6006').replace(':4318', ':6006')}")
+    
 except ImportError as e:
-    logger.warning(f"Phoenix module not found: {e}. Install with: pip install arize-phoenix")
+    logger.warning(f"Phoenix/OpenInference module not found: {e}")
+    logger.warning("Install with: pip install arize-phoenix-otel openinference-instrumentation-llama-index openinference-instrumentation-openai openinference-instrumentation-litellm")
+    phoenix_base_url = PHOENIX_COLLECTOR_ENDPOINT or "http://phoenix:6006"
+    otlp_endpoint = None
+    has_litellm_instrumentor = False
 except Exception as e:
     logger.warning(f"⚠️ Could not initialize Arize Phoenix tracing: {e}")
+    logger.exception(e)  # Log full traceback for debugging
+    phoenix_base_url = PHOENIX_COLLECTOR_ENDPOINT or "http://phoenix:6006"
+    otlp_endpoint = None
 
 # Now import other modules after tracing is set up
 from fastapi import FastAPI, HTTPException
@@ -227,7 +283,7 @@ async def health_check():
     phoenix_status = "unknown"
     try:
         import requests
-        response = requests.get(f"{phoenix_endpoint}/healthz", timeout=3)
+        response = requests.get(f"{phoenix_base_url}/healthz", timeout=3)
         phoenix_status = "connected" if response.status_code == 200 else "error"
     except Exception:
         phoenix_status = "disconnected"
@@ -236,8 +292,9 @@ async def health_check():
         "status": "healthy",
         "rag_initialized": rag_crew is not None,
         "phoenix_tracing": {
-            "endpoint": phoenix_endpoint,
-            "status": phoenix_status
+            "ui_endpoint": phoenix_base_url,
+            "status": phoenix_status,
+            "project": PHOENIX_PROJECT_NAME or "agentic-rag"
         },
         "timestamp": datetime.now().isoformat()
     }

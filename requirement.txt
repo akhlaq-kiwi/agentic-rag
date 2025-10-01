@@ -290,4 +290,6 @@ spacy
 sentence-transformers
 openinference-instrumentation>=0.1.9
 openinference-instrumentation-openai
+openinference-instrumentation-llama-index
+openinference-instrumentation-litellm
 opentelemetry-sdk
