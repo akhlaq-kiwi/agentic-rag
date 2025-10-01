@@ -65,7 +65,7 @@ document_researcher = Agent(
     llm=_llm,
     verbose=False,  # Reduced verbosity for speed
     allow_delegation=False,
-    max_iter=3,
+    max_iter=1,
 )
 
 # AGENT 2: Answer Generator (streamlined)

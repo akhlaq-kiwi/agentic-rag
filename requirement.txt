@@ -288,3 +288,6 @@ arize-phoenix-client
 numpy
 spacy
 sentence-transformers
+openinference-instrumentation>=0.1.9
+openinference-instrumentation-openai
+opentelemetry-sdk

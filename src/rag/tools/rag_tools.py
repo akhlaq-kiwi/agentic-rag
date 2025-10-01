@@ -4,95 +4,125 @@ import psycopg2.extras
 import json
 import requests
 from crewai.tools import tool
-from src.config import DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, EMBEDDING_LLM, OLLAMA_BASE_URL, DIM, DATABASE_TABLE
 import logging
 from typing import List, Dict, Any, Tuple
 import numpy as np
+import logging
+from typing import List
+from llama_index.embeddings.ollama import OllamaEmbedding
+from llama_index.vector_stores.postgres import PGVectorStore
+from llama_index.core import Settings, StorageContext, VectorStoreIndex
+from llama_index.core.schema import NodeWithScore
+from src.config import (
+    DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD,
+    DATABASE_NAME, DATABASE_TABLE, OLLAMA_BASE_URL, EMBEDDING_LLM, DIM
+)
+
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+
+# Load a pretrained ColBERT reranker
+model_name = "colbert-ir/colbertv2.0"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name)
+model.eval()
 
 logger = logging.getLogger(__name__)
 
+def rerank(query: str, nodes: List[NodeWithScore], top_k: int = 5) -> List[NodeWithScore]:
+    """Rerank candidate nodes using ColBERT."""
+    docs = [n.node.text for n in nodes]
+    inputs = [(query, d) for d in docs]
+
+    encodings = tokenizer(inputs, padding=True, truncation=True, return_tensors="pt")
+    with torch.no_grad():
+        scores = model(**encodings).logits.squeeze(-1)
+
+    # Attach scores back to nodes
+    scored_nodes = []
+    for node, score in zip(nodes, scores.tolist()):
+        node.score = score  # overwrite similarity score with reranker score
+        scored_nodes.append(node)
+
+    # Sort by reranker score
+    reranked = sorted(scored_nodes, key=lambda x: x.score, reverse=False)
+    return reranked[:top_k]
+
+
 @tool("pg_retriever_tool")
 def pg_retriever_tool(query: str) -> str:
-    """Retrieve relevant chunks from pgvector using direct PostgreSQL queries with hybrid search.
-    
-    This is a simplified, faster implementation that directly queries PostgreSQL
-    without using LlamaIndex's query engine to avoid timeouts.
+    """Retrieve relevant chunks from pgvector using LlamaIndex VectorStore.
     
     Args:
-        query: The search query string
-        
-    Returns:
-        A formatted string containing the retrieved chunks
-    """
-    print(f"DEBUG: Tool received query parameter: {repr(query)}")
+        query: The search query string.
     
-    # Validate input
+    Returns:
+        A formatted string containing retrieved chunks.
+    """
     if not query or query.strip() == "":
         return "Error: Empty query provided."
     
-    if query in ["The search query to find relevant documents"]:
-        return "Error: Tool received schema placeholder instead of actual query."
-    
-    query = query.strip()
-    
     try:
-        # Get query embedding from Ollama
-        query_embedding = get_ollama_embedding(query)
-        if not query_embedding:
-            return "Error: Failed to generate query embedding."
-        
-        # Connect to PostgreSQL
-        conn = psycopg2.connect(
-            host=DATABASE_HOST,
-            port=DATABASE_PORT,
-            database=DATABASE_NAME,
-            user=DATABASE_USER,
-            password=DATABASE_PASSWORD
+        # Configure embedding model
+        Settings.embed_model = OllamaEmbedding(
+            model_name=EMBEDDING_LLM,
+            base_url=OLLAMA_BASE_URL,
         )
-        
-        # Perform hybrid search
-        results = perform_hybrid_search(conn, query, query_embedding, top_k=5)
-        
-        conn.close()
-        
+
+        # Connect to pgvector
+        vector_store = PGVectorStore.from_params(
+            database=DATABASE_NAME,
+            host=DATABASE_HOST,
+            password=DATABASE_PASSWORD,
+            port=int(DATABASE_PORT),
+            user=DATABASE_USER,
+            schema_name="public",
+            table_name=DATABASE_TABLE,
+            hybrid_search=True,
+            embed_dim=768,  # Ensure this matches your embedding dimension
+        )
+
+        # Create retriever
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+        retriever = index.as_retriever(similarity_top_k=15)
+
+        # Perform search
+        nodes: List[NodeWithScore] = retriever.retrieve(query)
+
+        results = rerank(query, nodes, top_k=5)
+
         if not results:
             return "No relevant documents found for this query."
-        
-        # Format results with proper source attribution
-        formatted_chunks = []
-        
-        for i, (content, metadata, score) in enumerate(results, 1):
-            # Extract source information
-            source_info = "Unknown source"
-            page_info = ""
-            
-            if metadata:
-                # Extract file name
-                file_name = metadata.get('file_name', metadata.get('source', ''))
-                if file_name:
-                    source_info = file_name
-                
-                # Extract page number
-                page_no = metadata.get('page_no', '')
-                if page_no:
-                    page_info = f" (Page {page_no})"
-            
-            # Format each chunk with clear source attribution
-            formatted_chunk = f"""**Document Chunk {i}** (Relevance: {score:.3f})
-Source: {source_info}{page_info}
 
-Content:
-{content.strip()}"""
-            
+        # Format results
+        formatted_chunks: List[str] = []
+
+        for i, r in enumerate(results, 1):
+            node = r.node
+            score = r.score
+            # Handle score being a list or a float
+            if isinstance(score, list):
+                score_value = score[0] if score and isinstance(score[0], (float, int)) else None
+            elif isinstance(score, (float, int)):
+                score_value = score
+            else:
+                score_value = None
+
+            file_name = node.metadata.get("file_name", node.metadata.get("source", "Unknown source"))
+            page_no = node.metadata.get("page_no", "")
+            page_info = f" (Page {page_no})" if page_no else ""
+
+            if score_value is not None:
+                relevance_str = f"{score_value:.3f}"
+            else:
+                relevance_str = "N/A"
+
+            formatted_chunk = f"""**Document Chunk {i}** (Relevance: {relevance_str})\nSource: {file_name}{page_info}\n\nContent:\n{node.text.strip()}"""
             formatted_chunks.append(formatted_chunk)
-        
-        # Join all chunks with clear separators
-        result_text = "\n\n" + ("\n" + "="*80 + "\n\n").join(formatted_chunks)
-        
-        print(f"DEBUG: Retrieved {len(results)} chunks with source metadata")
-        print(result_text)
-        return result_text
-        
+
+        return "\n\n" + ("\n" + "="*80 + "\n\n").join(formatted_chunks)
+
     except Exception as e:
         logger.error(f"Error in pg_retriever_tool: {str(e)}")
         return f"Error retrieving documents: {str(e)}"
