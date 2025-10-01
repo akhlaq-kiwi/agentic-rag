@@ -90,7 +90,7 @@ except Exception as e:
 _llm = Ollama(
     model=f"ollama/{LLM}",  # LiteLLM format: "ollama/model-name"
     base_url=OLLAMA_BASE_URL,
-    temperature=0,
+    temperature=0.3,  # Increased from 0 to allow better context following
     timeout=300,
     verbose=True,  # Enable verbose logging for debugging
     request_timeout=300.0,
@@ -120,34 +120,81 @@ query_analyzer = Agent(
 
 document_researcher = Agent(
     role="Document Researcher",
-    goal="Use the pg_retriever_tool to find information relevant to a user\'s query from the knowledge base.",
+    goal="Retrieve relevant document chunks from the knowledge base using pg_retriever_tool exactly ONCE.",
     backstory=(
-        "You are an information retrieval specialist who excels at finding and preserving source information. Your role is to: "
-        "1) Use the pg_retriever_tool to search for relevant information based on the user's query "
-        "2) Return the retrieved content exactly as provided by the tool, preserving ALL source metadata "
-        "3) Ensure that document names, page numbers, and relevance scores are maintained "
-        "4) Do NOT summarize, interpret, or modify the retrieved content "
-        "5) Do NOT answer questions using your general knowledge "
-        "6) ALWAYS include the complete source information (filename, page number) with each chunk "
-        "Your output will be used by the next agent to formulate the final answer with proper citations."
+        "You are a document retrieval specialist. Your ONLY job is to call pg_retriever_tool ONCE and return its output. "
+        "\n\nIMPORTANT RULES:"
+        "\n1. Call pg_retriever_tool ONLY ONCE per task - never call it multiple times"
+        "\n2. Pass the query as a plain string: pg_retriever_tool('query text')"
+        "\n3. After calling the tool ONCE, immediately return its output WITHOUT modification"
+        "\n4. Do NOT evaluate if results are 'good enough' - just return what the tool gives you"
+        "\n5. Do NOT retry if you think results are insufficient - one call is enough"
+        "\n6. Do NOT call the tool for greetings - just return a friendly message"
+        "\n7. If the tool returns an error, report it and STOP - do not retry"
+        "\n8. Your task is complete after ONE tool call (or zero calls for greetings)"
+        "\n\nYour output will be used by the next agent to formulate the final answer."
     ),
     tools=[pg_retriever_tool],
     llm=_llm,
-    verbose=False,  # Reduced verbosity for speed
+    verbose=False,
     allow_delegation=False,
-    max_iter=1,
+    max_iter=1,  # Only 1 iteration - forces single tool call
 )
 
 # AGENT 2: Answer Generator (streamlined)
 insight_synthesizer = Agent(
     role='Insight Synthesizer',
-    goal='Create clear, professional responses that directly answer user questions with proper source citations.',
+    goal='Read the Document Researcher output and create a response using ONLY that information.',
     backstory=(
-        insight_synthesizer_backstory_prompt
+        """
+        You are a document synthesizer. You will receive research output from the Document Researcher Task.
+        Your job is to read that output carefully and create a response using ONLY the information in it.
+        
+        CRITICAL GROUNDING RULES:
+        1. READ the Document Researcher's output first - it contains all the information you need
+        2. Your response must be 100% based on what you read in that output
+        3. Every sentence you write must come from the research output
+        4. If the research output doesn't mention something, you CANNOT mention it either
+        5. You have NO memory, NO training data, NO general knowledge - ONLY what's in the research output
+        
+        HOW TO STAY GROUNDED:
+        - Before writing each sentence, ask: "Is this in the research output?"
+        - If yes, write it with a citation
+        - If no, don't write it
+        - If the research output is empty or doesn't answer the question, say: "The provided documents do not contain information about [topic]"
+                
+        RESPONSE REQUIREMENTS:
+        - Extract information ONLY from the Document Researcher's output
+        - Each chunk in the research output has a "Source:" line with filename and page number
+        - You MUST preserve and use these exact source references in your response
+        - Cite every fact with the exact source (filename, page number) from the research context
+        - If information is missing or incomplete, explicitly state: "The documents do not provide information about [topic]"
+        - Use natural language but stay 100% within the provided context
+        - For greetings, respond naturally without citations
+                
+        CITATION FORMAT - CRITICAL:
+        - The research output contains chunks with "Source: [Filename] (Page X)" format
+        - You MUST copy the EXACT page numbers from these "Source:" lines - DO NOT change them
+        - DO NOT use section numbers (like 2.9.3) - ONLY use the page numbers from "Source:" lines
+        - DO NOT infer or guess page numbers - ONLY use what appears after "Page" in the "Source:" line
+        - End with "Sources:" section listing ALL documents with their EXACT page numbers from the research output
+        - Example: If source says "Source: Procurement Manual.PDF (Page 83)", write "Sources: Procurement Manual.PDF (Page 83)"
+        - WRONG: "Sources: Item MDM Process.PDF (Page 2.9.3)" ← This is a section number, not a page number
+        - RIGHT: "Sources: Procurement Manual (Business Process).PDF (Page 83)" ← This is the exact page number from the source line
+                
+        STRICT PROHIBITIONS:
+        - Do NOT use general knowledge or training data
+        - Do NOT make inferences beyond what's explicitly stated
+        - Do NOT add information not present in the research context
+        - Do NOT generate followup questions or suggestions
+        - Do NOT add "Related questions:" or "Next steps:" sections
+        
+        If the research context is empty or insufficient, say so clearly - do not try to answer from memory.
+        """
     ),
     llm=_llm,
     verbose=True,
     allow_delegation=False,
-    max_iter=3,
+    max_iter=1,  # Only 1 iteration - forces agent to use context immediately
     tools=[]
 )
