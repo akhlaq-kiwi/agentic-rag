@@ -36,5 +36,11 @@ REDIS_PORT=int(os.getenv("REDIS_PORT", 6379))
 REDIS_DB=int(os.getenv("REDIS_DB", 0))
 CONVERSATION_HISTORY_LIMIT=int(os.getenv("CONVERSATION_HISTORY_LIMIT", 5))
 
+# Retrieval and Reranking Configuration
+RETRIEVAL_INITIAL_TOP_K=int(os.getenv("RETRIEVAL_INITIAL_TOP_K", 20))  # Initial candidates from vector search
+RETRIEVAL_FINAL_TOP_K=int(os.getenv("RETRIEVAL_FINAL_TOP_K", 5))      # Final chunks after reranking
+RETRIEVAL_SIMILARITY_CUTOFF=float(os.getenv("RETRIEVAL_SIMILARITY_CUTOFF", 0.5))  # Minimum similarity score
+RERANKING_DIVERSITY_WEIGHT=float(os.getenv("RERANKING_DIVERSITY_WEIGHT", 0.3))   # Diversity penalty weight (0.0-1.0)
+
 
 
